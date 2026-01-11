@@ -5,7 +5,6 @@ import {
   ExternalLink, FileSpreadsheet, ChevronRight, UserPlus, Edit2, Trash2, X, Save, Printer, Wallet, Star
 } from 'lucide-react';
 import { AppState, Customer, UserPermissions } from '../types';
-import { NATIONALITIES } from '../constants';
 
 interface CustomersProps {
   state: AppState;
@@ -25,28 +24,6 @@ const Customers: React.FC<CustomersProps> = ({ state, onUpdateCustomer, onDelete
       (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase()))
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [state.customers, searchQuery]);
-
-  const exportToCSV = () => {
-    const headers = ['Guest Name', 'Phone', 'Email', 'Nationality', 'Stay Count', 'Total Spent EGP'];
-    const rows = filteredCustomers.map(c => {
-       const guestBookings = state.bookings.filter(b => b.customerId === c.id && b.status !== 'cancelled');
-       const totalSpent = guestBookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.paidAmount * 50 : b.paidAmount), 0);
-       return [
-         c.name,
-         c.phone,
-         c.email || 'N/A',
-         c.nationality,
-         guestBookings.length,
-         totalSpent.toFixed(2)
-       ];
-    });
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `bahia_crm_export_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,22 +52,15 @@ const Customers: React.FC<CustomersProps> = ({ state, onUpdateCustomer, onDelete
           <div className="relative flex-1 md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
-              placeholder="Search by identity, contact, email..." 
+              placeholder="Search guests..." 
               className="w-full pl-12 pr-6 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:border-sky-500 outline-none font-bold text-xs transition-all"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
-          {permissions.canExportData && (
-            <div className="flex gap-2">
-              <button onClick={exportToCSV} className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
-                <FileSpreadsheet className="w-4 h-4" /> Export CSV
-              </button>
-              <button onClick={() => window.print()} className="flex items-center gap-2 bg-slate-950 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-sky-500 transition-all">
-                <Printer className="w-4 h-4" /> Print PDF
-              </button>
-            </div>
-          )}
+          <button onClick={() => window.print()} className="bg-slate-950 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 hover:bg-sky-500 transition-all">
+            <Printer className="w-4 h-4" /> Print PDF
+          </button>
         </div>
       </div>
 
@@ -99,72 +69,58 @@ const Customers: React.FC<CustomersProps> = ({ state, onUpdateCustomer, onDelete
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">
               <th className="px-10 py-6">Guest Profile</th>
-              <th className="px-10 py-6">Direct Access</th>
-              <th className="px-10 py-6">Region</th>
-              <th className="px-10 py-6 text-center">Engagement Metrics</th>
-              <th className="px-10 py-6 text-right no-print">Management</th>
+              <th className="px-10 py-6">Contact</th>
+              <th className="px-10 py-6">Nationality</th>
+              <th className="px-10 py-6 text-right no-print">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {filteredCustomers.map(c => {
-               const guestBookings = state.bookings.filter(b => b.customerId === c.id && b.status !== 'cancelled');
-               return (
-                <tr key={c.id} className="hover:bg-slate-50 transition-all group">
-                  <td className="px-10 py-5">
-                    <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 group-hover:bg-slate-950 group-hover:text-white transition-all shadow-sm">
-                        <UserCircle className="w-8 h-8" />
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-950 text-base tracking-tight truncate uppercase leading-none">{c.name}</p>
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mt-3">Ref ID: {c.id.substring(0, 8)}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-10 py-5 space-y-2">
-                    <div className="flex items-center gap-2 text-slate-900 font-black text-xs">
-                      <Phone className="w-4 h-4 text-emerald-500" /> {c.phone}
-                    </div>
-                    {c.email && (
-                      <div className="flex items-center gap-2 text-slate-400 font-bold text-[10px]">
-                        <Mail className="w-4 h-4 text-sky-400" /> {c.email}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-10 py-5">
-                    <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-50 rounded-xl w-fit border border-slate-100">
-                      <Globe className="w-4 h-4 text-slate-400" />
-                      <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">{c.nationality}</span>
-                    </div>
-                  </td>
-                  <td className="px-10 py-5 text-center">
-                    <div className="inline-flex gap-8 items-center">
-                       <div className="text-center">
-                          <span className="text-2xl font-black text-slate-950 leading-none block">{guestBookings.length}</span>
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-2 block">Folios</span>
-                       </div>
-                       <div className="text-center border-l pl-8 border-slate-100">
-                          <span className="text-base font-black text-emerald-600 leading-none block flex items-center gap-1"><Wallet className="w-3 h-3" /> {guestBookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.paidAmount * 50 : b.paidAmount), 0).toLocaleString()}</span>
-                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-2 block">Value (EGP)</span>
-                       </div>
-                    </div>
-                  </td>
-                  <td className="px-10 py-5 text-right no-print">
-                     <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                        {permissions.canManageCustomers && (
-                          <button onClick={() => setEditModal({ open: true, customer: { ...c } })} className="p-3 bg-white text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl border border-slate-100 transition-all shadow-sm"><Edit2 className="w-5 h-5" /></button>
-                        )}
-                        {permissions.canDeleteCustomers && (
-                          <button onClick={() => { if(window.confirm('Delete guest profile permanently?')) onDeleteCustomer(c.id); }} className="p-3 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-100 transition-all shadow-sm"><Trash2 className="w-5 h-5" /></button>
-                        )}
-                     </div>
-                  </td>
-                </tr>
-              ))}
+            {filteredCustomers.map(c => (
+              <tr key={c.id} className="hover:bg-slate-50 transition-all group">
+                <td className="px-10 py-5">
+                  <div className="flex items-center gap-5">
+                    <UserCircle className="w-10 h-10 text-slate-400" />
+                    <p className="font-black text-slate-950 text-base uppercase">{c.name}</p>
+                  </div>
+                </td>
+                <td className="px-10 py-5 text-xs text-slate-900">
+                  <p>{c.phone}</p>
+                  <p className="text-[10px] text-slate-400">{c.email}</p>
+                </td>
+                <td className="px-10 py-5 uppercase text-xs text-slate-500 font-black">{c.nationality}</td>
+                <td className="px-10 py-5 text-right no-print">
+                   <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => setEditModal({ open: true, customer: { ...c } })} className="p-3 bg-white text-slate-400 hover:text-sky-600 rounded-xl border border-slate-100 shadow-sm"><Edit2 className="w-4 h-4" /></button>
+                      <button onClick={() => { if(window.confirm('Delete guest?')) onDeleteCustomer(c.id); }} className="p-3 bg-white text-slate-400 hover:text-rose-600 rounded-xl border border-slate-100 shadow-sm"><Trash2 className="w-4 h-4" /></button>
+                   </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-      {/* Edit Modal Re-included internally */}
+
+      {editModal.open && editModal.customer && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[500] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[3rem] p-10 max-w-lg w-full border-2 border-slate-900 animate-in zoom-in-95">
+             <div className="flex justify-between items-center mb-8">
+                <h3 className="text-2xl font-black text-slate-950 tracking-tighter uppercase">Edit Guest Identity</h3>
+                <button onClick={() => setEditModal({ open: false, customer: null })}><X className="w-8 h-8 text-slate-950" /></button>
+             </div>
+             <form onSubmit={handleEditSubmit} className="space-y-6">
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Full Name</label>
+                   <input required className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black" value={editModal.customer.name} onChange={e => setEditModal({ ...editModal, customer: { ...editModal.customer!, name: e.target.value } })} />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Phone Contact</label>
+                   <input required className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black" value={editModal.customer.phone} onChange={e => setEditModal({ ...editModal, customer: { ...editModal.customer!, phone: e.target.value } })} />
+                </div>
+                <button type="submit" className="w-full py-6 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl hover:bg-sky-600 transition-all">Save Profile Changes</button>
+             </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
