@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserPlus, ShoppingCart, UserCheck
+  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserPlus, ShoppingCart, UserCheck, ArrowRight
 } from 'lucide-react';
 import { AppState, Booking, BookingStatus, ExtraService } from '../types';
 import { getSmartSummary } from '../services/geminiService';
@@ -23,7 +23,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   const [serviceIsPaid, setServiceIsPaid] = useState(true);
 
   const todayStr = '2026-01-07';
-  const tomorrowStr = '2026-01-08';
 
   const totals = useMemo(() => {
     let egp = 0;
@@ -38,8 +37,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   }, [state.bookings]);
 
   const stats = [
-    { label: 'EGP Balance', value: `${totals.egp.toLocaleString()} EGP`, icon: Banknote, bg: 'bg-slate-900', target: 'reports' },
-    { label: 'USD Balance', value: `${totals.usd.toLocaleString()} USD`, icon: DollarSign, bg: 'bg-sky-600', target: 'reports' },
+    { label: 'EGP Collected', value: `${totals.egp.toLocaleString()} EGP`, icon: Banknote, bg: 'bg-slate-900', target: 'reports' },
+    { label: 'USD Collected', value: `${totals.usd.toLocaleString()} USD`, icon: DollarSign, bg: 'bg-sky-600', target: 'reports' },
     { label: 'Occupancy', value: `${state.bookings.filter(b => b.status === 'stay').length}/${state.apartments.length}`, icon: TrendingUp, bg: 'bg-white', target: 'calendar' },
     { label: 'Total Guests', value: state.customers.length, icon: UsersIcon, bg: 'bg-white', target: 'customers' },
   ];
@@ -58,24 +57,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
   }, [state.bookings, state.customers, state.apartments]);
 
-  const logistics48H = useMemo(() => {
-    return state.bookings.filter(b => {
-      if (b.status === 'cancelled' || b.status === 'checked_out' || b.status === 'maintenance') return false;
-      const isArrivalWindow = b.startDate === todayStr || b.startDate === tomorrowStr;
-      const isDepartureWindow = b.endDate === todayStr || b.endDate === tomorrowStr;
-      const isPendingArrival = isArrivalWindow && b.status === 'confirmed';
-      const isActiveDeparture = isDepartureWindow && b.status === 'stay';
-      return isPendingArrival || isActiveDeparture;
-    }).map(b => {
-      const targetDate = (b.startDate === todayStr || b.startDate === tomorrowStr) && b.status === 'confirmed' ? b.startDate : b.endDate;
-      return {
-        ...b,
-        logType: (b.startDate === todayStr || b.startDate === tomorrowStr) && b.status === 'confirmed' ? 'Arrival' : 'Departure',
-        displayDate: targetDate
-      };
-    }).sort((a, b) => a.logType === 'Arrival' ? -1 : 1);
-  }, [state.bookings]);
-
   const handleGenerateSummary = async () => {
     setIsLoadingSummary(true);
     const summary = await getSmartSummary(state);
@@ -87,7 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     <div className="space-y-10 animate-in fade-in duration-700 pb-20">
       <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
         <div>
-          <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">Operations Hub</h2>
+          <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">Management Hub</h2>
           <p className="text-slate-400 mt-3 font-bold text-[10px] flex items-center gap-2 uppercase tracking-[0.4em]">
             <ShieldCheck className="w-5 h-5 text-sky-600" /> Bahia Hurghada Intelligence
           </p>
@@ -100,39 +81,62 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         </div>
       </div>
 
-      {/* Quick Action Center */}
-      <div className="bg-white p-8 rounded-[3rem] border-2 border-slate-100 shadow-sm flex flex-wrap gap-4 items-center">
-          <div className="bg-slate-900 text-white p-4 rounded-3xl flex items-center gap-4 mr-4">
-             <Plus className="w-6 h-6 text-sky-400" />
-             <span className="font-black text-xs uppercase tracking-widest">Add Operations:</span>
+      {/* Quick Access Grid - تكملة "اضافة ا..." */}
+      <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-12 opacity-5">
+             <Plus className="w-40 h-40 text-white" />
           </div>
-          <button onClick={() => onTabChange?.('bookings')} className="group flex items-center gap-4 bg-slate-50 border-2 border-slate-100 p-5 rounded-[2rem] hover:border-sky-500 hover:bg-white transition-all">
-             <div className="w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center group-hover:bg-sky-500 group-hover:text-white transition-colors">
-                <ConciergeBell className="w-6 h-6" />
+          <div className="relative z-10">
+             <div className="flex items-center gap-4 mb-8">
+                <div className="w-1.5 h-6 bg-sky-500 rounded-full"></div>
+                <h3 className="text-white font-black text-xs uppercase tracking-[0.3em]">Operational Quick Actions</h3>
              </div>
-             <div className="text-left">
-                <p className="font-black text-xs uppercase text-slate-900">New Booking</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Room & Stay</p>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <button onClick={() => onTabChange?.('bookings')} className="group bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-sky-500 transition-all flex flex-col gap-4 text-left">
+                   <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <ConciergeBell className="w-6 h-6 text-white" />
+                   </div>
+                   <div>
+                      <p className="text-white font-black text-sm uppercase">Add Reservation</p>
+                      <p className="text-white/40 text-[10px] font-bold uppercase mt-1 group-hover:text-white/80">New Stay Entry</p>
+                   </div>
+                   <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-white ml-auto" />
+                </button>
+
+                <button onClick={() => onTabChange?.('apartments')} className="group bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-emerald-600 transition-all flex flex-col gap-4 text-left">
+                   <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <Building2 className="w-6 h-6 text-white" />
+                   </div>
+                   <div>
+                      <p className="text-white font-black text-sm uppercase">Add New Unit</p>
+                      <p className="text-white/40 text-[10px] font-bold uppercase mt-1 group-hover:text-white/80">Expand Inventory</p>
+                   </div>
+                   <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-white ml-auto" />
+                </button>
+
+                <button onClick={() => onTabChange?.('maintenance')} className="group bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-rose-600 transition-all flex flex-col gap-4 text-left">
+                   <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <ShoppingCart className="w-6 h-6 text-white" />
+                   </div>
+                   <div>
+                      <p className="text-white font-black text-sm uppercase">Add Expense</p>
+                      <p className="text-white/40 text-[10px] font-bold uppercase mt-1 group-hover:text-white/80">Log Maintenance</p>
+                   </div>
+                   <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-white ml-auto" />
+                </button>
+
+                <button onClick={() => onTabChange?.('team')} className="group bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-indigo-600 transition-all flex flex-col gap-4 text-left">
+                   <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <UserPlus className="w-6 h-6 text-white" />
+                   </div>
+                   <div>
+                      <p className="text-white font-black text-sm uppercase">Add Staff</p>
+                      <p className="text-white/40 text-[10px] font-bold uppercase mt-1 group-hover:text-white/80">Security Access</p>
+                   </div>
+                   <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-white ml-auto" />
+                </button>
              </div>
-          </button>
-          <button onClick={() => onTabChange?.('apartments')} className="group flex items-center gap-4 bg-slate-50 border-2 border-slate-100 p-5 rounded-[2rem] hover:border-emerald-500 hover:bg-white transition-all">
-             <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                <Building2 className="w-6 h-6" />
-             </div>
-             <div className="text-left">
-                <p className="font-black text-xs uppercase text-slate-900">New Unit</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Asset Register</p>
-             </div>
-          </button>
-          <button onClick={() => onTabChange?.('maintenance')} className="group flex items-center gap-4 bg-slate-50 border-2 border-slate-100 p-5 rounded-[2rem] hover:border-rose-500 hover:bg-white transition-all">
-             <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                <ShoppingCart className="w-6 h-6" />
-             </div>
-             <div className="text-left">
-                <p className="font-black text-xs uppercase text-slate-900">Log Expense</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Operations Outflow</p>
-             </div>
-          </button>
+          </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -156,7 +160,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
               <div className="flex gap-2">
                 {currentStays.map(s => (
                    <button key={s.id} onClick={() => setSelectedStayForService(s)} className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl font-black text-[10px] uppercase hover:bg-slate-900 hover:text-white transition-all">
-                      Add to U-{state.apartments.find(a => a.id === s.apartmentId)?.unitNumber}
+                      U-{state.apartments.find(a => a.id === s.apartmentId)?.unitNumber}
                    </button>
                 ))}
               </div>
@@ -181,25 +185,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
               )) : (
                 <div className="py-10 text-center text-slate-300 font-black uppercase text-xs tracking-widest">No active stay requests</div>
               )}
-            </div>
-          </div>
-
-          <div className="bg-slate-900 p-10 rounded-[3rem] shadow-xl text-white relative overflow-hidden">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-xl font-black tracking-tighter uppercase flex items-center gap-3"><Clock className="w-5 h-5 text-sky-400" /> Logistics (Next 48H)</h3>
-              <span className="bg-white/10 text-[9px] font-black px-4 py-2 rounded-xl">{logistics48H.length} ACTIONS</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {logistics48H.map(b => (
-                <div key={b.id} className="bg-white/5 p-6 rounded-[2rem] border border-white/10 flex justify-between items-center">
-                  <div>
-                    <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${b.logType === 'Arrival' ? 'bg-emerald-600' : 'bg-rose-600'}`}>{b.logType}</span>
-                    <p className="font-black text-base mt-2 text-white">Unit {state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}</p>
-                    <p className="text-[10px] text-white/40 font-bold uppercase">{b.displayDate}</p>
-                  </div>
-                  <button onClick={() => onOpenDetails(b.id)} className="p-3 bg-white text-slate-900 rounded-xl hover:bg-sky-400 hover:text-white transition-all"><Eye className="w-4 h-4" /></button>
-                </div>
-              ))}
             </div>
           </div>
         </div>
