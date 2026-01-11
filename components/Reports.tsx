@@ -1,11 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, TrendingDown, Scale, Calendar, Printer, Bed, Zap, FileText, Search, 
-  CreditCard, DollarSign, Globe, ShoppingCart, Percent, Building2, ArrowUpRight, 
-  ArrowDownRight, Filter, Download, PieChart, Wallet, Layers, Briefcase, Activity,
-  ArrowRightLeft, Landmark, Coins, Smartphone, Calculator, AlertCircle, ArrowRight,
-  FileSpreadsheet, CheckCircle, Clock
+  TrendingUp, Calendar, Printer, Bed, Zap, Search, 
+  ShoppingCart, Percent, Building2, Wallet, Layers, 
+  Landmark, Coins, Smartphone, Calculator, AlertCircle, ArrowRight,
+  FileSpreadsheet, CheckCircle, Clock, Download, Activity, PieChart
 } from 'lucide-react';
 import { AppState, Booking, Expense, Currency } from '../types';
 import { USD_TO_EGP_RATE, PLATFORMS, PAYMENT_METHODS } from '../constants';
@@ -28,10 +27,11 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
     const data = {
       transactions: [] as any[],
       byPaymentMethod: {} as Record<string, { collected: number, receivable: number }>,
-      byUnit: {} as Record<string, { revenue: number, services: number, expenses: number, commissions: number, net: number, nights: number, bookings: number }>,
+      byUnit: {} as Record<string, { revenue: number, services: number, expenses: number, commissionsPaid: number, commissionsDue: number, net: number, nights: number, bookings: number }>,
       totalGrossRevenue: 0,
       totalExpenses: 0,
-      totalCommissions: 0,
+      totalCommissionsPaid: 0,
+      totalCommissionsDue: 0,
       totalServices: 0,
       totalReceivables: 0,
       totalAvailableNights: state.apartments.length * rangeDays,
@@ -40,7 +40,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
 
     // Init data structures
     state.apartments.forEach(a => {
-      data.byUnit[a.id] = { revenue: 0, services: 0, expenses: 0, commissions: 0, net: 0, nights: 0, bookings: 0 };
+      data.byUnit[a.id] = { revenue: 0, services: 0, expenses: 0, commissionsPaid: 0, commissionsDue: 0, net: 0, nights: 0, bookings: 0 };
     });
     PAYMENT_METHODS.forEach(m => data.byPaymentMethod[m] = { collected: 0, receivable: 0 });
 
@@ -57,7 +57,9 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       data.totalGrossRevenue += totalValueEGP;
       data.totalReceivables += dueEGP;
       data.totalSoldNights += nights;
-      data.totalCommissions += commissionEGP;
+
+      if (b.commissionPaid) data.totalCommissionsPaid += commissionEGP;
+      else data.totalCommissionsDue += commissionEGP;
 
       // Treasury Method tracking
       if (data.byPaymentMethod[b.paymentMethod]) {
@@ -75,7 +77,8 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       if (data.byUnit[b.apartmentId]) {
         data.byUnit[b.apartmentId].revenue += (totalValueEGP - servicesTotalEGP);
         data.byUnit[b.apartmentId].services += servicesTotalEGP;
-        data.byUnit[b.apartmentId].commissions += commissionEGP;
+        if (b.commissionPaid) data.byUnit[b.apartmentId].commissionsPaid += commissionEGP;
+        else data.byUnit[b.apartmentId].commissionsDue += commissionEGP;
         data.byUnit[b.apartmentId].bookings += 1;
         data.byUnit[b.apartmentId].nights += nights;
       }
@@ -94,6 +97,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         amountEGP: collectedEGP,
         receivableEGP: dueEGP,
         commissionEGP: commissionEGP,
+        commPaid: b.commissionPaid,
         status: dueEGP === 0 ? 'Settled' : 'Partial'
       });
     });
@@ -130,14 +134,14 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
     // Final Unit Profit calculation (Revenue + Services - Expenses - Commissions)
     Object.keys(data.byUnit).forEach(id => {
       const u = data.byUnit[id];
-      u.net = (u.revenue + u.services) - u.expenses - u.commissions;
+      u.net = (u.revenue + u.services) - u.expenses - (u.commissionsPaid + u.commissionsDue);
     });
 
     return data;
   }, [state, dateRange]);
 
   const kpis = useMemo(() => {
-    const netProfit = finance.totalGrossRevenue - finance.totalExpenses - finance.totalCommissions;
+    const netProfit = finance.totalGrossRevenue - finance.totalExpenses - (finance.totalCommissionsPaid + finance.totalCommissionsDue);
     const adr = finance.totalSoldNights > 0 ? (finance.totalGrossRevenue - finance.totalServices) / finance.totalSoldNights : 0;
     const occupancy = finance.totalAvailableNights > 0 ? (finance.totalSoldNights / finance.totalAvailableNights * 100).toFixed(1) : 0;
     const revpar = finance.totalAvailableNights > 0 ? (finance.totalGrossRevenue - finance.totalServices) / finance.totalAvailableNights : 0;
@@ -170,7 +174,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
           <div>
             <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Accounting Console</h2>
             <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.4em] mt-2 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> BAHIA HURGHADA LEDGER V16.2
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> BAHIA HURGHADA LEDGER V16.5
             </p>
           </div>
         </div>
@@ -192,7 +196,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          <div className="bg-slate-950 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"><TrendingUp className="w-24 h-24" /></div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-2">Gross Revenue</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-2">Gross Revenue (EGP Eq.)</p>
             <h3 className="text-4xl font-black tracking-tighter">{finance.totalGrossRevenue.toLocaleString()} <span className="text-xs opacity-30 uppercase">EGP</span></h3>
             <div className="mt-4 flex items-center gap-2 text-[9px] uppercase opacity-50">
                <Bed className="w-3 h-3" /> {(finance.totalGrossRevenue - finance.totalServices).toLocaleString()} Stays
@@ -202,12 +206,11 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
          </div>
 
          <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden">
-            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-2">Total Outflow</p>
-            <h3 className="text-4xl font-black tracking-tighter text-slate-900">{(finance.totalExpenses + finance.totalCommissions).toLocaleString()} <span className="text-xs opacity-30 uppercase">EGP</span></h3>
-            <div className="mt-4 flex items-center gap-2 text-[9px] uppercase">
-               <span className="text-rose-500 font-black">{finance.totalExpenses.toLocaleString()} Ops</span>
-               <span className="text-slate-200">/</span>
-               <span className="text-amber-500 font-black">{finance.totalCommissions.toLocaleString()} Comm.</span>
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 mb-2">Commissions Detail</p>
+            <h3 className="text-3xl font-black tracking-tighter text-slate-900">{(finance.totalCommissionsPaid + finance.totalCommissionsDue).toLocaleString()} <span className="text-xs opacity-30 uppercase">EGP</span></h3>
+            <div className="mt-4 flex flex-col gap-1 text-[9px] uppercase">
+               <span className="text-emerald-500 font-black flex justify-between">Paid: <span>{finance.totalCommissionsPaid.toLocaleString()}</span></span>
+               <span className="text-amber-500 font-black flex justify-between">Due: <span>{finance.totalCommissionsDue.toLocaleString()}</span></span>
             </div>
          </div>
 
@@ -221,8 +224,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
          <div className="bg-sky-600 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden">
             <p className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-2">RevPAR / ADR</p>
             <div className="flex items-baseline gap-2">
-               <h3 className="text-4xl font-black tracking-tighter">{Math.round(kpis.revpar).toLocaleString()} <span className="text-xs opacity-50">EGP</span></h3>
-               <span className="text-[9px] uppercase opacity-50">RevPAR</span>
+               <h3 className="text-4xl font-black tracking-tighter">{Math.round(kpis.revpar).toLocaleString()} <span className="text-[9px] opacity-50">EGP</span></h3>
             </div>
             <p className="mt-4 text-[9px] uppercase font-black">ADR: {Math.round(kpis.adr).toLocaleString()} EGP • Occ: {kpis.occupancy}%</p>
          </div>
@@ -324,7 +326,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                {state.apartments.map(apt => {
-                  const stats = finance.byUnit[apt.id] || { revenue: 0, services: 0, expenses: 0, commissions: 0, net: 0, bookings: 0, nights: 0 };
+                  const stats = finance.byUnit[apt.id] || { revenue: 0, services: 0, expenses: 0, commissionsPaid: 0, commissionsDue: 0, net: 0, bookings: 0, nights: 0 };
                   return (
                      <div key={apt.id} className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:border-slate-950 transition-all group">
                         <div className="p-8 bg-slate-950 text-white flex justify-between items-center relative overflow-hidden">
@@ -353,8 +355,8 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                                  <p className="text-sm font-black text-rose-950">-{stats.expenses.toLocaleString()}</p>
                               </div>
                               <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100">
-                                 <p className="text-[8px] font-black text-amber-600 uppercase mb-1">Sales Comm.</p>
-                                 <p className="text-sm font-black text-amber-950">-{stats.commissions.toLocaleString()}</p>
+                                 <p className="text-[8px] font-black text-amber-600 uppercase mb-1">Total Comm.</p>
+                                 <p className="text-sm font-black text-amber-950">-{ (stats.commissionsPaid + stats.commissionsDue).toLocaleString() }</p>
                               </div>
                            </div>
                            <div className="pt-6 border-t border-slate-50 flex justify-between items-center">
@@ -419,7 +421,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                            <td className="px-8 py-5 text-right">
                               <div className="flex flex-col items-end">
                                  {t.receivableEGP > 0 && <span className="text-rose-400 font-black">{t.receivableEGP.toLocaleString()} due</span>}
-                                 {t.commissionEGP > 0 && <span className="text-amber-500 text-[8px] font-black uppercase">{t.commissionEGP.toLocaleString()} comm.</span>}
+                                 {t.commissionEGP > 0 && <span className={`${t.commPaid ? 'text-emerald-500' : 'text-amber-500'} text-[8px] font-black uppercase`}>{t.commissionEGP.toLocaleString()} {t.commPaid ? 'comm. paid' : 'comm. due'}</span>}
                                  {t.receivableEGP === 0 && t.commissionEGP === 0 && <span className="text-slate-200">—</span>}
                               </div>
                            </td>
@@ -447,11 +449,11 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                   </button>
                </div>
                <div className="space-y-6">
-                  {['MAINTENANCE', 'SUPPLIES', 'UTILITY', 'COMMISSION', 'OTHER'].map(cat => {
+                  {['MAINTENANCE', 'SUPPLIES', 'UTILITY', 'OTHER'].map(cat => {
                      const catSum = finance.transactions
                         .filter(t => t.type === 'OUTFLOW' && t.category === cat)
                         .reduce((acc, curr) => acc + curr.amountEGP, 0);
-                     const percentage = finance.totalExpenses + finance.totalCommissions > 0 ? (catSum / (finance.totalExpenses + finance.totalCommissions) * 100).toFixed(0) : 0;
+                     const percentage = finance.totalExpenses > 0 ? (catSum / finance.totalExpenses * 100).toFixed(0) : 0;
                      if (catSum === 0) return null;
                      return (
                         <div key={cat} className="space-y-3">
@@ -481,7 +483,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                   </div>
                   <div className="bg-white/5 p-6 rounded-3xl border border-white/10 space-y-4">
                      <p className="text-[11px] font-bold text-slate-400 leading-relaxed italic border-l-4 border-sky-500 pl-4 uppercase">
-                        "Sales Commissions account for {((finance.totalCommissions / (finance.totalGrossRevenue || 1)) * 100).toFixed(1)}% of your gross revenue. Consider prioritizing direct bookings via WhatsApp to reduce channel costs."
+                        "Total Commissions account for {(((finance.totalCommissionsPaid + finance.totalCommissionsDue) / (finance.totalGrossRevenue || 1)) * 100).toFixed(1)}% of your gross revenue."
                      </p>
                   </div>
                </div>
