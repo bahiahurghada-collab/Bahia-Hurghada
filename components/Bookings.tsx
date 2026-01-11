@@ -4,7 +4,7 @@ import {
   Plus, Building, Trash2, Edit2, Search, X, Wallet, 
   Calendar, Zap, UserCheck, RefreshCw, AlertTriangle, Hammer,
   User as UserIcon, Phone, Mail, Globe, Clock, CreditCard, StickyNote, Check,
-  ConciergeBell, Eye, BadgePercent, Printer, FileText, Download, MessageCircle, ArrowRight, TrendingUp, CheckCircle, Timer, Percent
+  ConciergeBell, Eye, BadgePercent, Printer, FileText, Download, MessageCircle, ArrowRight, TrendingUp, CheckCircle, Timer, Percent, Users, ReceiptText
 } from 'lucide-react';
 import { AppState, Booking, Customer, PaymentStatus, BookingStatus, Currency, StayService, ExtraService } from '../types';
 import { PLATFORMS, PAYMENT_METHODS, CURRENCIES, NATIONALITIES, USD_TO_EGP_RATE } from '../constants';
@@ -31,6 +31,7 @@ const Bookings: React.FC<BookingsProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showInvoice, setShowInvoice] = useState<Booking | null>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -110,6 +111,30 @@ const Bookings: React.FC<BookingsProps> = ({
     }));
   };
 
+  const handleGuestSelect = (cid: string) => {
+    if (cid === 'new') {
+      setFormData(prev => ({ 
+        ...prev, 
+        customerId: 'new', 
+        newCustomer: { name: '', phone: '', email: '', nationality: 'Egyptian' } 
+      }));
+    } else {
+      const guest = state.customers.find(c => c.id === cid);
+      if (guest) {
+        setFormData(prev => ({ 
+          ...prev, 
+          customerId: cid, 
+          newCustomer: { 
+            name: guest.name, 
+            phone: guest.phone, 
+            email: guest.email || '', 
+            nationality: guest.nationality 
+          } 
+        }));
+      }
+    }
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const { customerId, newCustomer, selectedServiceIds, ...rest } = formData;
@@ -159,6 +184,10 @@ const Bookings: React.FC<BookingsProps> = ({
       fulfilledServices: b.fulfilledServices || []
     });
     setIsModalOpen(true);
+  };
+
+  const printInvoice = () => {
+    window.print();
   };
 
   const filteredBookings = useMemo(() => {
@@ -233,6 +262,7 @@ const Bookings: React.FC<BookingsProps> = ({
                      </td>
                      <td className="px-6 py-3 text-right">
                         <div className="flex justify-end gap-1">
+                           <button onClick={() => setShowInvoice(b)} className="p-2 bg-slate-50 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Generate Invoice"><ReceiptText className="w-3.5 h-3.5" /></button>
                            <button onClick={() => startEdit(b)} className="p-2 bg-slate-50 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-all"><Edit2 className="w-3 h-3" /></button>
                            <button onClick={() => onDeleteBooking(b.id)} className="p-2 bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><Trash2 className="w-3 h-3" /></button>
                         </div>
@@ -242,6 +272,231 @@ const Bookings: React.FC<BookingsProps> = ({
                })}
              </tbody>
            </table>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoice && (
+        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[3000] flex items-center justify-center p-4">
+           <div className="bg-white rounded-[3rem] w-full max-w-4xl shadow-2xl border-4 border-slate-950 flex flex-col max-h-[96vh] overflow-hidden no-print">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <div className="flex items-center gap-3">
+                    <div className="p-3 bg-slate-950 text-white rounded-2xl"><ReceiptText className="w-6 h-6" /></div>
+                    <h3 className="text-2xl font-black text-slate-950 tracking-tighter uppercase">Guest Invoice Preview</h3>
+                 </div>
+                 <div className="flex gap-3">
+                    <button onClick={printInvoice} className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
+                       <Printer className="w-4 h-4" /> Print PDF Invoice
+                    </button>
+                    <button onClick={() => setShowInvoice(null)} className="p-3 hover:bg-slate-200 rounded-full transition-all text-slate-950"><X className="w-7 h-7" /></button>
+                 </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-12 bg-white">
+                 <div className="invoice-content max-w-3xl mx-auto space-y-12">
+                    {/* Invoice Header */}
+                    <div className="flex justify-between items-start border-b-4 border-slate-950 pb-8">
+                       <div>
+                          <h1 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">BAHIA HURGHADA<span className="text-sky-500">.</span></h1>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mt-2">Premium Property Management</p>
+                          <div className="mt-6 text-[11px] font-bold text-slate-500 space-y-1">
+                             <p>Hurghada, Red Sea, Egypt</p>
+                             <p>Phone: +20 123 456 7890</p>
+                             <p>Email: admin@bahia-residence.com</p>
+                          </div>
+                       </div>
+                       <div className="text-right">
+                          <h2 className="text-6xl font-black text-slate-100 uppercase -mt-4">INVOICE</h2>
+                          <div className="mt-4 space-y-1">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Serial Number</p>
+                             <p className="text-xl font-black text-slate-950">#{showInvoice.displayId}</p>
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">Issue Date</p>
+                             <p className="text-sm font-black text-slate-900">{new Date().toLocaleDateString()}</p>
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Guest & Stay Details */}
+                    <div className="grid grid-cols-2 gap-12">
+                       <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Guest Information</p>
+                          <h4 className="text-2xl font-black text-slate-950 uppercase">{state.customers.find(c => c.id === showInvoice.customerId)?.name}</h4>
+                          <div className="mt-4 space-y-2 text-xs font-bold text-slate-600">
+                             <p className="flex items-center gap-2"><Phone className="w-3 h-3 text-emerald-500" /> {state.customers.find(c => c.id === showInvoice.customerId)?.phone}</p>
+                             <p className="flex items-center gap-2"><Mail className="w-3 h-3 text-sky-500" /> {state.customers.find(c => c.id === showInvoice.customerId)?.email || 'N/A'}</p>
+                             <p className="flex items-center gap-2"><Globe className="w-3 h-3 text-slate-400" /> {state.customers.find(c => c.id === showInvoice.customerId)?.nationality}</p>
+                          </div>
+                       </div>
+                       <div className="p-8 bg-slate-950 text-white rounded-3xl relative overflow-hidden">
+                          <div className="absolute top-0 right-0 p-4 opacity-10"><Building className="w-20 h-20" /></div>
+                          <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-4">Stay Summary</p>
+                          <div className="space-y-4">
+                             <div>
+                                <p className="text-[9px] font-black text-slate-500 uppercase">Unit Number</p>
+                                <p className="text-2xl font-black">U-{state.apartments.find(a => a.id === showInvoice.apartmentId)?.unitNumber}</p>
+                             </div>
+                             <div className="flex gap-8">
+                                <div>
+                                   <p className="text-[9px] font-black text-slate-500 uppercase">Check-In</p>
+                                   <p className="text-sm font-black">{showInvoice.startDate}</p>
+                                </div>
+                                <div>
+                                   <p className="text-[9px] font-black text-slate-500 uppercase">Check-Out</p>
+                                   <p className="text-sm font-black">{showInvoice.endDate}</p>
+                                </div>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+
+                    {/* Breakdown Table */}
+                    <div className="space-y-4">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Charges Breakdown</p>
+                       <table className="w-full text-left">
+                          <thead>
+                             <tr className="bg-slate-950 text-white text-[9px] font-black uppercase tracking-widest">
+                                <th className="px-6 py-4 rounded-tl-xl">Description</th>
+                                <th className="px-6 py-4">Quantity / Type</th>
+                                <th className="px-6 py-4 text-right rounded-tr-xl">Subtotal ({showInvoice.currency})</th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 border border-slate-100">
+                             <tr className="text-[12px] font-bold">
+                                <td className="px-6 py-5">Core Accommodation Services</td>
+                                <td className="px-6 py-5 text-slate-500">
+                                   {Math.max(1, Math.ceil((new Date(showInvoice.endDate).getTime() - new Date(showInvoice.startDate).getTime()) / (1000 * 60 * 60 * 24)))} Nights
+                                </td>
+                                <td className="px-6 py-5 text-right font-black">
+                                   {(showInvoice.totalAmount - (showInvoice.extraServices?.reduce((a,c) => a + c.price, 0) || 0) - (showInvoice.services?.reduce((acc, sid) => acc + (state.services.find(s => s.id === sid)?.price || 0), 0) || 0)).toLocaleString()}
+                                </td>
+                             </tr>
+                             {showInvoice.services?.map(sid => {
+                                const s = state.services.find(x => x.id === sid);
+                                return s ? (
+                                   <tr key={s.id} className="text-[11px] font-bold text-slate-600 bg-slate-50/50">
+                                      <td className="px-6 py-4">{s.name} (Initial Amenity)</td>
+                                      <td className="px-6 py-4 uppercase">Included</td>
+                                      <td className="px-6 py-4 text-right font-black">{s.price.toLocaleString()}</td>
+                                   </tr>
+                                ) : null;
+                             })}
+                             {showInvoice.extraServices?.map(es => (
+                                <tr key={es.id} className="text-[11px] font-bold text-slate-600">
+                                   <td className="px-6 py-4">{es.name} (Additional)</td>
+                                   <td className="px-6 py-4 uppercase">{es.date}</td>
+                                   <td className="px-6 py-4 text-right font-black">{es.price.toLocaleString()}</td>
+                                </tr>
+                             ))}
+                          </tbody>
+                          <tfoot>
+                             <tr className="bg-slate-50 border-t-2 border-slate-950">
+                                <td colSpan={2} className="px-6 py-5 text-right font-black uppercase text-[10px] text-slate-500">Grand Total</td>
+                                <td className="px-6 py-5 text-right text-2xl font-black text-slate-950">{showInvoice.totalAmount.toLocaleString()} <span className="text-xs">{showInvoice.currency}</span></td>
+                             </tr>
+                             <tr className="bg-white">
+                                <td colSpan={2} className="px-6 py-3 text-right font-black uppercase text-[9px] text-emerald-600">Amount Settled</td>
+                                <td className="px-6 py-3 text-right text-lg font-black text-emerald-600">-{showInvoice.paidAmount.toLocaleString()}</td>
+                             </tr>
+                             <tr className="bg-slate-950 text-white">
+                                <td colSpan={2} className="px-6 py-5 text-right font-black uppercase text-[11px] tracking-widest">Balance Outstanding</td>
+                                <td className="px-6 py-5 text-right text-2xl font-black text-rose-400">{(showInvoice.totalAmount - showInvoice.paidAmount).toLocaleString()} {showInvoice.currency}</td>
+                             </tr>
+                          </tfoot>
+                       </table>
+                    </div>
+
+                    <div className="flex justify-between items-end pt-12">
+                       <div className="max-w-xs text-[10px] font-bold text-slate-400 leading-relaxed">
+                          <p className="font-black text-slate-900 uppercase mb-2">Terms & Conditions</p>
+                          <p>Thank you for choosing Bahia Hurghada. All services provided are subject to our standard terms of agreement. For any inquiries, please contact our accounting department.</p>
+                       </div>
+                       <div className="text-center">
+                          <div className="w-48 h-1 bg-slate-950 mb-4"></div>
+                          <p className="text-[9px] font-black uppercase text-slate-400">Management Authorization</p>
+                          <p className="text-sm font-black text-slate-950 mt-1">Bahia OS Terminal</p>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+
+           {/* Hidden Invoice For Print */}
+           <div className="hidden print:block fixed inset-0 bg-white p-0">
+               <div className="invoice-box">
+                  <div className="flex justify-between items-start border-b-4 border-black pb-8">
+                      <div>
+                        <h1 className="text-4xl font-black text-black tracking-tighter uppercase leading-none">BAHIA HURGHADA.</h1>
+                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] mt-2">Premium Property Management</p>
+                        <div className="mt-6 text-[11px] font-bold text-slate-700 space-y-1">
+                            <p>Hurghada, Red Sea, Egypt</p>
+                            <p>Phone: +20 123 456 7890</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <h2 className="text-5xl font-black text-slate-300 uppercase">INVOICE</h2>
+                        <p className="text-xl font-black text-black mt-4">#{showInvoice.displayId}</p>
+                        <p className="text-sm font-bold text-slate-600">{new Date().toLocaleDateString()}</p>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-8 mt-12">
+                      <div className="p-6 border border-slate-200">
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Guest Profile</p>
+                        <h4 className="text-xl font-black text-black uppercase">{state.customers.find(c => c.id === showInvoice.customerId)?.name}</h4>
+                        <p className="text-xs font-bold text-slate-700 mt-2">{state.customers.find(c => c.id === showInvoice.customerId)?.phone}</p>
+                      </div>
+                      <div className="p-6 border border-slate-200">
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Stay Record</p>
+                        <p className="text-xl font-black text-black">U-{state.apartments.find(a => a.id === showInvoice.apartmentId)?.unitNumber}</p>
+                        <p className="text-xs font-bold text-slate-700 mt-2">{showInvoice.startDate} to {showInvoice.endDate}</p>
+                      </div>
+                  </div>
+
+                  <table className="w-full mt-12 text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-black font-black uppercase text-[10px]">
+                            <th className="text-left py-3">Description</th>
+                            <th className="text-right py-3">Amount ({showInvoice.currency})</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr className="font-bold">
+                            <td className="py-4">Stay Accommodation Charge</td>
+                            <td className="text-right">{(showInvoice.totalAmount - (showInvoice.extraServices?.reduce((a,c) => a + c.price, 0) || 0) - (showInvoice.services?.reduce((acc, sid) => acc + (state.services.find(s => s.id === sid)?.price || 0), 0) || 0)).toLocaleString()}</td>
+                        </tr>
+                        {showInvoice.services?.map(sid => {
+                            const s = state.services.find(x => x.id === sid);
+                            return s ? (
+                                <tr key={s.id} className="text-slate-600">
+                                  <td className="py-3">{s.name}</td>
+                                  <td className="text-right">{s.price.toLocaleString()}</td>
+                                </tr>
+                            ) : null;
+                        })}
+                        {showInvoice.extraServices?.map(es => (
+                            <tr key={es.id} className="text-slate-600">
+                              <td className="py-3">{es.name} ({es.date})</td>
+                              <td className="text-right">{es.price.toLocaleString()}</td>
+                            </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-black font-black">
+                            <td className="py-4 text-right">TOTAL AMOUNT DUE</td>
+                            <td className="text-right text-xl">{showInvoice.totalAmount.toLocaleString()}</td>
+                        </tr>
+                        <tr className="text-emerald-700">
+                            <td className="py-2 text-right">AMOUNT PAID</td>
+                            <td className="text-right">-{showInvoice.paidAmount.toLocaleString()}</td>
+                        </tr>
+                        <tr className="font-black text-xl border-t border-black">
+                            <td className="py-4 text-right">BALANCE PAYABLE</td>
+                            <td className="text-right">{(showInvoice.totalAmount - showInvoice.paidAmount).toLocaleString()} {showInvoice.currency}</td>
+                        </tr>
+                      </tfoot>
+                  </table>
+               </div>
+           </div>
         </div>
       )}
 
@@ -265,7 +520,20 @@ const Bookings: React.FC<BookingsProps> = ({
                 {/* Guest Details */}
                 <div className="lg:col-span-2 space-y-6">
                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-4">
-                     <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><UserIcon className="w-3 h-3 text-sky-500" /> Guest Identity</h4>
+                     <div className="flex justify-between items-center">
+                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><UserIcon className="w-3 h-3 text-sky-500" /> Guest Identity</h4>
+                        <div className="relative group">
+                           <Users className="w-3.5 h-3.5 text-sky-500 absolute left-2.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none" />
+                           <select 
+                             className="pl-8 pr-4 py-1.5 rounded-lg border border-slate-200 bg-white font-black text-[9px] uppercase outline-none focus:border-sky-500 transition-all appearance-none cursor-pointer min-w-[150px]"
+                             value={formData.customerId}
+                             onChange={e => handleGuestSelect(e.target.value)}
+                           >
+                              <option value="new">New Record</option>
+                              {state.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                           </select>
+                        </div>
+                     </div>
                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Full Guest Name</label>

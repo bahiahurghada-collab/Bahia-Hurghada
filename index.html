@@ -44,6 +44,29 @@
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
       ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+      @media print {
+        aside, header, button, .no-print, nav {
+          display: none !important;
+        }
+        main {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: white !important;
+          color: black !important;
+        }
+        #root { background: white !important; height: auto !important; }
+        .p-6 { padding: 0 !important; }
+        .rounded-[3rem], .rounded-[2.5rem], .rounded-xl { border-radius: 0 !important; border: none !important; box-shadow: none !important; }
+        .bg-slate-950, .bg-slate-900 { background: #000 !important; color: white !important; -webkit-print-color-adjust: exact; }
+        .text-white { color: black !important; }
+        .bg-white { background: white !important; }
+        .bg-slate-50, .bg-sky-50, .bg-emerald-50 { background: transparent !important; border: 1px solid #eee !important; }
+        .shadow-xl, .shadow-2xl, .shadow-sm { box-shadow: none !important; }
+        table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #ddd !important; }
+        th, td { border: 1px solid #ddd !important; padding: 8px !important; }
+        .invoice-box { padding: 40px !important; border: 1px solid #000 !important; }
+      }
     </style>
     <script type="importmap">
 {
