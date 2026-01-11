@@ -41,6 +41,9 @@ const INITIAL_STATE: AppState = {
   expenses: [], logs: [], notifications: [], users: [DEFAULT_ADMIN], currentUser: null
 };
 
+// مفتاح حفظ الجلسة في المتصفح
+const SESSION_STORAGE_KEY = 'bahia_active_user_id';
+
 const App: React.FC = () => {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -57,11 +60,16 @@ const App: React.FC = () => {
   const [bookingInitialData, setBookingInitialData] = useState<{ aptId: string; start: string; end: string } | null>(null);
   const [editBookingId, setEditBookingId] = useState<string | null>(null);
 
-  // تحديث التاريخ ليكون ديناميكياً
   const SYSTEM_TODAY = new Date().toISOString().split('T')[0];
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+
+  // منطق الخروج ومسح الجلسة
+  const handleLogout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }, []);
 
   const performSync = useCallback(async (forceUpdate: boolean = false) => {
     if (isSyncing || !isSupabaseConfigured()) return;
@@ -91,6 +99,7 @@ const App: React.FC = () => {
     }
   }, [state, isSyncing]);
 
+  // التحميل الأولي للداتا واستعادة الجلسة
   useEffect(() => {
     const init = async () => {
       if (!isSupabaseConfigured()) {
@@ -99,14 +108,26 @@ const App: React.FC = () => {
       }
       try {
         const result = await databaseService.fetchState();
+        let currentState = INITIAL_STATE;
         if (result) {
-          setState(result.state);
+          currentState = result.state;
+          setState(currentState);
           setLastSyncTime(new Date());
         } else {
           const success = await databaseService.saveState(INITIAL_STATE);
           if (success) {
              setState(INITIAL_STATE);
              setLastSyncTime(new Date());
+          }
+        }
+
+        // استعادة الجلسة بعد تحميل بيانات المستخدمين
+        const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedUserId) {
+          const foundUser = currentState.users.find(u => u.id === savedUserId);
+          if (foundUser && foundUser.isActive) {
+            setUser(foundUser);
+            console.log(`Bahia PMS: Session restored for ${foundUser.name}`);
           }
         }
       } catch (e: any) {
@@ -274,7 +295,11 @@ const App: React.FC = () => {
           <form onSubmit={(e) => {
             e.preventDefault();
             const found = state.users.find(u => u.username === loginUsername && u.password === loginPassword);
-            if (found) { setUser(found); addLog('Login', found.name); } else setLoginError(true);
+            if (found) { 
+              setUser(found); 
+              localStorage.setItem(SESSION_STORAGE_KEY, found.id); // حفظ الجلسة
+              addLog('Login', found.name); 
+            } else setLoginError(true);
           }} className="space-y-6">
             <input type="text" required placeholder="Staff Username" className="w-full px-8 py-5 rounded-2xl border border-white/10 bg-white/5 !text-white font-black text-sm outline-none focus:border-sky-500 transition-all" value={loginUsername} onChange={e => setLoginUsername(e.target.value)} />
             <input type="password" required placeholder="Security Key" className="w-full px-8 py-5 rounded-2xl border border-white/10 bg-white/5 !text-white font-black text-sm outline-none focus:border-sky-500 transition-all" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
@@ -293,7 +318,7 @@ const App: React.FC = () => {
 
   return (
     <Layout 
-      activeTab={activeTab} onTabChange={setActiveTab} user={user} onLogout={() => setUser(null)} 
+      activeTab={activeTab} onTabChange={setActiveTab} user={user} onLogout={handleLogout} 
       notifications={state.notifications} onMarkRead={() => {}} 
       isSyncing={isSyncing} lastSyncTime={lastSyncTime} onManualSync={() => performSync(true)}
     >
