@@ -298,7 +298,7 @@ const Bookings: React.FC<BookingsProps> = ({
                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1 col-span-2">
                            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Unit Assignment</label>
-                           <select required className="w-full p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-xs" value={formData.apartmentId} onChange={e => setFormData({ ...formData, apartmentId: e.target.value })}>
+                           <select required className="w-full p-2.5 rounded-xl border-slate-100 bg-slate-50 font-black text-xs" value={formData.apartmentId} onChange={e => setFormData({ ...formData, apartmentId: e.target.value })}>
                              <option value="">Choose Room...</option>
                              {state.apartments.map(a => <option key={a.id} value={a.id}>U-{a.unitNumber} ({a.view})</option>)}
                            </select>
@@ -364,7 +364,8 @@ const Bookings: React.FC<BookingsProps> = ({
                            {CURRENCIES.map(c => <option key={c} value={c} className="text-slate-900">{c}</option>)}
                          </select>
                          <select className="bg-white/5 border border-white/10 p-2.5 rounded-xl font-black text-[10px] outline-none cursor-pointer" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
-                           {PAYNING_METHODS.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
+                           {/* Fix: Corrected PAYNING_METHODS typo to PAYMENT_METHODS */}
+                           {PAYMENT_METHODS.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
                          </select>
                       </div>
 

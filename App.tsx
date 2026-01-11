@@ -62,6 +62,11 @@ const App: React.FC = () => {
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoStatusTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+  const stateRef = useRef<AppState>(INITIAL_STATE);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const generateDisplayId = () => `BH-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
@@ -81,52 +86,56 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs].slice(0, 100) }));
   }, [user]);
 
+  // دالة المزامنة مفصولة تماماً عن تحديث الواجهة لمنع الـ Lag
+  const triggerSync = useCallback(async (newState: AppState) => {
+    if (!isSupabaseConfigured() || isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await databaseService.saveState(newState);
+      setLastSyncTime(new Date());
+      setSyncError(null);
+    } catch (err: any) {
+      setSyncError(err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isSyncing]);
+
   const handleStateUpdate = useCallback((newState: AppState) => {
     setState(newState);
-    if (!isSupabaseConfigured()) return;
-    setIsSyncing(true);
-    databaseService.saveState(newState).then((success) => {
-      setIsSyncing(false);
-      if (success) {
-        setLastSyncTime(new Date());
-        setSyncError(null);
-      }
-    }).catch(err => {
-      setIsSyncing(false);
-      setSyncError(err.message);
-    });
-  }, []);
+    triggerSync(newState);
+  }, [triggerSync]);
 
-  // Fix: Definition moved above useEffect to avoid "used before its declaration" error.
   const performSync = useCallback(async (forceUpdate: boolean = false) => {
     if (isSyncing || !isSupabaseConfigured()) return;
     setIsSyncing(true);
-    setSyncError(null);
     try {
+      const current = stateRef.current;
       if (forceUpdate) {
-        await databaseService.saveState(state);
+        await databaseService.saveState(current);
         setLastSyncTime(new Date());
       } else {
-        const result = await databaseService.fetchState(state.lastUpdated);
+        const result = await databaseService.fetchState(current.lastUpdated);
         if (result && result.hasUpdates) {
           setState(result.state);
           setLastSyncTime(new Date());
         }
       }
     } catch (error: any) {
-      setSyncError(error.message || "Connection Error");
+      setSyncError(error.message);
     } finally {
       setIsSyncing(false);
     }
-  }, [state, isSyncing]);
+  }, [isSyncing]);
 
-  // Fix: Definition moved above useEffect to avoid "used before its declaration" error.
   const runAutoStatusEngine = useCallback(() => {
+    const current = stateRef.current;
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
     const currentTimeStr = now.toTimeString().slice(0, 5);
     let hasChanges = false;
-    const updatedBookings = state.bookings.map(b => {
+    
+    const updatedBookings = current.bookings.map(b => {
       if (b.status === 'confirmed' || b.status === 'pending') {
         const checkInTime = b.checkInTime || '14:00';
         if (b.startDate < todayStr || (b.startDate === todayStr && currentTimeStr >= checkInTime)) {
@@ -143,53 +152,104 @@ const App: React.FC = () => {
       }
       return b;
     });
+
     if (hasChanges) {
-      handleStateUpdate({ ...state, bookings: updatedBookings });
+      handleStateUpdate({ ...current, bookings: updatedBookings });
     }
-  }, [state, handleStateUpdate]);
+  }, [handleStateUpdate]);
+
+  useEffect(() => {
+    const init = async () => {
+      if (!isSupabaseConfigured()) { setIsInitialLoading(false); return; }
+      try {
+        const result = await databaseService.fetchState();
+        if (result) {
+          setState(result.state);
+          stateRef.current = result.state;
+          setLastSyncTime(new Date());
+        }
+        const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedUserId) {
+          const foundUser = (result ? result.state.users : INITIAL_STATE.users).find(u => u.id === savedUserId);
+          if (foundUser && foundUser.isActive) setUser(foundUser);
+        }
+      } catch (e: any) {
+        setSyncError(e.message);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+    init();
+
+    syncTimerRef.current = setInterval(() => { performSync(false); }, 45000);
+    autoStatusTimerRef.current = setInterval(() => { runAutoStatusEngine(); }, 60000);
+
+    return () => {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+      if (autoStatusTimerRef.current) clearInterval(autoStatusTimerRef.current);
+    };
+  }, []);
+
+  const handleUpdateBooking = (id: string, updates: Partial<Booking>) => {
+    setState(prev => {
+      const updated = prev.bookings.map(b => b.id === id ? { ...b, ...updates } : b);
+      const newState = { ...prev, bookings: updated };
+      // نؤجل المزامنة للتقليل من الـ Lag
+      setTimeout(() => triggerSync(newState), 0);
+      return newState;
+    });
+    addLog('Update Booking', `ID: ${id}`);
+  };
 
   const handleQuickSettle = (bookingId: string) => {
     const booking = state.bookings.find(b => b.id === bookingId);
     if (!booking) return;
-
-    const newState = {
-      ...state,
-      bookings: state.bookings.map(b => 
-        b.id === bookingId 
-          ? { ...b, paidAmount: b.totalAmount, paymentStatus: 'Paid' as const } 
-          : b
-      )
-    };
-    handleStateUpdate(newState);
-    addLog('Quick Settlement', `Folio ${booking.displayId} fully paid.`);
+    handleUpdateBooking(bookingId, { paidAmount: booking.totalAmount, paymentStatus: 'Paid' });
   };
 
-  const handleFulfillService = (bookingId: string, serviceId: string, isExtra: boolean = false) => {
-    const booking = state.bookings.find(b => b.id === bookingId);
-    if (!booking) return;
-
-    const newState = {
-      ...state,
-      bookings: state.bookings.map(b => {
+  // تم إصلاح الخطأ الـ Syntax هنا
+  const handleFulfillService = useCallback((bookingId: string, serviceId: string, isExtra: boolean = false) => {
+    setState(prev => {
+      const updatedBookings = prev.bookings.map(b => {
         if (b.id !== bookingId) return b;
         if (isExtra) {
-          return {
-            ...b,
-            extraServices: b.extraServices.map(es => es.id === serviceId ? { ...es, isFulfilled: true } : es)
+          return { ...b, extraServices: b.extraServices.map(es => es.id === serviceId ? { ...es, isFulfilled: true } : es) };
+        } else {
+          return { ...b, fulfilledServices: Array.from(new Set([...(b.fulfilledServices || []), serviceId])) };
+        }
+      });
+      const newState = { ...prev, bookings: updatedBookings };
+      setTimeout(() => triggerSync(newState), 0);
+      return newState;
+    });
+    addLog('Service Delivered', `Fulfillment for ${bookingId}`);
+  }, [triggerSync, addLog]);
+
+  // حذف سجل خدمة من الأرشيف
+  const handleDeleteServiceRecord = useCallback((bookingId: string, recordId: string, isExtra: boolean) => {
+    setState(prev => {
+      const updatedBookings = prev.bookings.map(b => {
+        if (b.id !== bookingId) return b;
+        if (isExtra) {
+          const serviceToRemove = b.extraServices.find(es => es.id === recordId);
+          const newPrice = b.totalAmount - (serviceToRemove?.price || 0);
+          const newPaid = serviceToRemove?.isPaid ? b.paidAmount - (serviceToRemove?.price || 0) : b.paidAmount;
+          return { 
+            ...b, 
+            extraServices: b.extraServices.filter(es => es.id !== recordId),
+            totalAmount: newPrice,
+            paidAmount: newPaid
           };
         } else {
-          const alreadyFulfilled = b.fulfilledServices || [];
-          if (alreadyFulfilled.includes(serviceId)) return b;
-          return {
-            ...b,
-            fulfilledServices: [...alreadyFulfilled, serviceId]
-          };
+          return { ...b, fulfilledServices: (b.fulfilledServices || []).filter(sid => sid !== recordId) };
         }
-      })
-    };
-    handleStateUpdate(newState);
-    addLog('Service Fulfillment', `Service ${serviceId} completed for ${booking.displayId}`);
-  };
+      });
+      const newState = { ...prev, bookings: updatedBookings };
+      setTimeout(() => triggerSync(newState), 0);
+      return newState;
+    });
+    addLog('Archive Cleanup', `Service record removed from ${bookingId}`);
+  }, [triggerSync, addLog]);
 
   const handleAddBooking = (b: Omit<Booking, 'id' | 'displayId'>, nc?: Omit<Customer, 'id'>) => {
     let finalCustomerId = b.customerId;
@@ -209,48 +269,7 @@ const App: React.FC = () => {
     };
     const newState = { ...state, customers, bookings: [...state.bookings, newBooking] };
     handleStateUpdate(newState);
-    addLog('New Booking Saved', `Record ${newBooking.displayId} created for Unit ${state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}`);
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      if (!isSupabaseConfigured()) { setIsInitialLoading(false); return; }
-      try {
-        const result = await databaseService.fetchState();
-        let currentState = INITIAL_STATE;
-        if (result) {
-          currentState = result.state;
-          setState(currentState);
-          setLastSyncTime(new Date());
-        }
-        const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (savedUserId) {
-          const foundUser = currentState.users.find(u => u.id === savedUserId);
-          if (foundUser && foundUser.isActive) setUser(foundUser);
-        }
-      } catch (e: any) {
-        setSyncError(e.message || "Failed to initialize");
-      } finally {
-        setIsInitialLoading(false);
-      }
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    if (isInitialLoading || !user || !isSupabaseConfigured()) return;
-    syncTimerRef.current = setInterval(() => { performSync(false); }, 30000);
-    autoStatusTimerRef.current = setInterval(() => { runAutoStatusEngine(); }, 60000);
-    return () => {
-      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
-      if (autoStatusTimerRef.current) clearInterval(autoStatusTimerRef.current);
-    };
-  }, [isInitialLoading, user, performSync, state, runAutoStatusEngine]);
-
-  const handleUpdateBooking = (id: string, updates: Partial<Booking>) => {
-    const newState = { ...state, bookings: state.bookings.map(b => b.id === id ? { ...b, ...updates } : b) };
-    handleStateUpdate(newState);
-    addLog('Update Booking', `ID: ${id}`);
+    addLog('New Booking', `Record ${newBooking.displayId} saved`);
   };
 
   const handleAddStayService = (bookingId: string, serviceId: string, paymentMethod: string, isPaid: boolean) => {
@@ -265,18 +284,12 @@ const App: React.FC = () => {
       date: new Date().toISOString().split('T')[0], paymentMethod, isPaid,
       isFulfilled: false
     };
-    const newState = {
-      ...state,
-      bookings: state.bookings.map(b => {
-        if (b.id === bookingId) {
-          const currentExtra = b.extraServices || [];
-          return { ...b, extraServices: [...currentExtra, newStayService], paidAmount: isPaid ? b.paidAmount + serviceTemplate.price : b.paidAmount, totalAmount: b.totalAmount + serviceTemplate.price };
-        }
-        return b;
-      })
-    };
-    handleStateUpdate(newState);
-    addLog('Add Service', `Amenity Added to ${booking.displayId}`);
+
+    handleUpdateBooking(bookingId, {
+      extraServices: [...(booking.extraServices || []), newStayService],
+      totalAmount: booking.totalAmount + serviceTemplate.price,
+      paidAmount: isPaid ? booking.paidAmount + serviceTemplate.price : booking.paidAmount
+    });
   };
 
   if (isInitialLoading) {
@@ -327,19 +340,19 @@ const App: React.FC = () => {
         initialSelection={bookingInitialData} initialEditId={editBookingId}
         onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking}
         onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})}
-        onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})}
+        onDeleteBooking={(id) => setState(prev => ({...prev, bookings: prev.bookings.filter(b => b.id !== id)}))}
       />
       {activeTab === 'dashboard' && <Dashboard state={state} onAddService={handleAddStayService} onUpdateBooking={handleUpdateBooking} onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} onTabChange={setActiveTab} onQuickSettle={handleQuickSettle} onFulfillService={handleFulfillService} />}
       {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} />}
-      {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => handleStateUpdate({...state, apartments: [...state.apartments, {...a, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, apartments: state.apartments.map(a => a.id === id ? {...a, ...u} : a)})} onDelete={(id) => handleStateUpdate({...state, apartments: state.apartments.filter(a => a.id !== id)})} />}
-      {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})} />}
-      {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={(id, u) => handleStateUpdate({...state, customers: state.customers.map(c => c.id === id ? {...c, ...u} : c)})} onDeleteCustomer={id => handleStateUpdate({...state, customers: state.customers.filter(c => c.id !== id)})} permissions={user.permissions} />}
-      {activeTab === 'maintenance' && <MaintenanceManagement expenses={state.expenses} apartments={state.apartments} onAddExpense={(exp) => handleStateUpdate({...state, expenses: [...state.expenses, {...exp, id: Math.random().toString(36).substr(2, 9)} ]})} onDeleteExpense={(id) => handleStateUpdate({...state, expenses: state.expenses.filter(e => e.id !== id)})} />}
+      {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => setState(prev => ({...prev, apartments: [...prev.apartments, {...a, id: Math.random().toString(36).substr(2, 9)}]}))} onUpdate={(id, u) => setState(prev => ({...prev, apartments: prev.apartments.map(a => a.id === id ? {...a, ...u} : a)}))} onDelete={(id) => setState(prev => ({...prev, apartments: prev.apartments.filter(a => a.id !== id)}))} />}
+      {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => setState(prev => ({...prev, bookings: prev.bookings.filter(b => b.id !== id)}))} />}
+      {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={(id, u) => setState(prev => ({...prev, customers: prev.customers.map(c => c.id === id ? {...c, ...u} : c)}))} onDeleteCustomer={id => setState(prev => ({...prev, customers: prev.customers.filter(c => c.id !== id)}))} permissions={user.permissions} />}
+      {activeTab === 'maintenance' && <MaintenanceManagement expenses={state.expenses} apartments={state.apartments} onAddExpense={(exp) => setState(prev => ({...prev, expenses: [...prev.expenses, {...exp, id: Math.random().toString(36).substr(2, 9)}]}))} onDeleteExpense={(id) => setState(prev => ({...prev, expenses: prev.expenses.filter(e => e.id !== id)}))} />}
       {activeTab === 'commissions' && <CommissionManagement state={state} onUpdateBooking={handleUpdateBooking} />}
       {activeTab === 'reports' && <Reports state={state} />}
-      {activeTab === 'services' && <ServicesManagement state={state} onAdd={s => handleStateUpdate({...state, services: [...state.services, {...s, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, services: state.services.map(s => s.id === id ? {...s, ...u} : s)})} onDelete={id => handleStateUpdate({...state, services: state.services.filter(s => s.id !== id)})} onFulfillService={handleFulfillService} />}
-      {activeTab === 'team' && <UserManagement users={state.users} onAddUser={(u) => handleStateUpdate({...state, users: [...state.users, {...u, id: Math.random().toString(36).substr(2, 9)} as any ]})} onUpdateUser={(id, u) => handleStateUpdate({...state, users: state.users.map(us => us.id === id ? {...us, ...u} : us)})} onDeleteUser={id => handleStateUpdate({...state, users: state.users.filter(u => u.id !== id)})} />}
-      {activeTab === 'logs' && <SystemLogs state={state} onImport={async (file) => handleStateUpdate(await storageService.importData(file))} onClearLogs={() => handleStateUpdate({...state, logs: []})} />}
+      {activeTab === 'services' && <ServicesManagement state={state} onAdd={s => setState(prev => ({...prev, services: [...prev.services, {...s, id: Math.random().toString(36).substr(2, 9)}]}))} onUpdate={(id, u) => setState(prev => ({...prev, services: prev.services.map(s => s.id === id ? {...s, ...u} : s)}))} onDelete={id => setState(prev => ({...prev, services: prev.services.filter(s => s.id !== id)}))} onFulfillService={handleFulfillService} onDeleteHistoryItem={handleDeleteServiceRecord} onEditBooking={handleUpdateBooking} />}
+      {activeTab === 'team' && <UserManagement users={state.users} onAddUser={(u) => setState(prev => ({...prev, users: [...prev.users, {...u, id: Math.random().toString(36).substr(2, 9)} as any]}))} onUpdateUser={(id, u) => setState(prev => ({...prev, users: prev.users.map(us => us.id === id ? {...us, ...u} : us)}))} onDeleteUser={id => setState(prev => ({...prev, users: prev.users.filter(u => u.id !== id)}))} />}
+      {activeTab === 'logs' && <SystemLogs state={state} onImport={async (file) => handleStateUpdate(await storageService.importData(file))} onClearLogs={() => setState(prev => ({...prev, logs: []}))} />}
     </Layout>
   );
 };
