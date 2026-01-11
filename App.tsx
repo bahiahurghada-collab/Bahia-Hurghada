@@ -57,7 +57,8 @@ const App: React.FC = () => {
   const [bookingInitialData, setBookingInitialData] = useState<{ aptId: string; start: string; end: string } | null>(null);
   const [editBookingId, setEditBookingId] = useState<string | null>(null);
 
-  const SYSTEM_TODAY = '2026-01-07';
+  // تحديث التاريخ ليكون ديناميكياً
+  const SYSTEM_TODAY = new Date().toISOString().split('T')[0];
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [state, setState] = useState<AppState>(INITIAL_STATE);
