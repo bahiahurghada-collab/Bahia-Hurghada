@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  Download, ArrowDownCircle, Banknote, ConciergeBell, Printer, CheckCircle2, Table as TableIcon, Building, Zap, FileJson, TrendingUp, FileSpreadsheet, Hourglass, Percent, TrendingDown, Scale, User, CreditCard, Calendar, ShoppingCart, Info, Search, History, ChevronRight, ArrowUpRight, DollarSign
+  Download, ArrowDownCircle, Banknote, ConciergeBell, Printer, CheckCircle2, Table as TableIcon, Building, Zap, FileJson, TrendingUp, FileSpreadsheet, Hourglass, Percent, TrendingDown, Scale, User, CreditCard, Calendar, ShoppingCart, Info, Search, History, ChevronRight, ArrowUpRight, DollarSign, ArrowDownRight, FileText, MoveRight
 } from 'lucide-react';
 import { AppState, StayService } from '../types';
 import { USD_TO_EGP_RATE } from '../constants';
@@ -60,7 +60,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         roomSummary[apartment.id].commission += (isEGP ? b.commissionAmount : b.commissionAmount * USD_TO_EGP_RATE);
       }
 
-      // 1. Ledger Entry: Reservation Payment
       if (b.paidAmount > 0) {
         ledger.push({
           id: `book-${b.id}`,
@@ -68,7 +67,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
           type: 'INFLOW',
           category: 'BOOKING_PAYMENT',
           entity: customer?.name || 'Walk-in Guest',
-          details: `Unit ${apartment?.unitNumber} Reservation (${b.startDate} to ${b.endDate})`,
+          details: `Unit ${apartment?.unitNumber} Reservation`,
           amount: b.paidAmount,
           currency: b.currency,
           method: b.paymentMethod,
@@ -76,14 +75,13 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         });
       }
 
-      // 2. Ledger Entry: Platform Commission (If Unpaid/Recorded)
       if (b.commissionAmount > 0) {
         ledger.push({
           id: `comm-${b.id}`,
           date: b.startDate,
           type: 'OUTFLOW',
-          category: 'PLATFORM_FEE',
-          entity: b.platform,
+          category: 'STAFF_COMMISSION',
+          entity: b.receptionistName || 'Staff',
           details: `Commission for Unit ${apartment?.unitNumber} (Guest: ${customer?.name})`,
           amount: b.commissionAmount,
           currency: b.currency,
@@ -92,7 +90,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         });
       }
 
-      // 3. Ledger Entry: Extra Services
       if (b.extraServices) {
         b.extraServices.forEach(s => {
           const sPriceEGP = isEGP ? s.price : s.price * USD_TO_EGP_RATE;
@@ -117,7 +114,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       }
     });
 
-    // 4. Ledger Entry: Maintenance & General Expenses
     filteredExpenses.forEach(e => {
       const apt = state.apartments.find(a => a.id === e.apartmentId);
       if (e.apartmentId && roomSummary[e.apartmentId]) {
@@ -149,122 +145,133 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
   const totalPendingEGP = reportData.pendingEGP + (reportData.pendingUSD * USD_TO_EGP_RATE);
   const totalOutflowEGP = reportData.totalCommissionEGP + (reportData.totalCommissionUSD * USD_TO_EGP_RATE) + state.expenses.reduce((acc, e) => acc + (e.currency === 'EGP' ? e.amount : e.amount * USD_TO_EGP_RATE), 0);
 
+  const exportLedgerCSV = () => {
+    const headers = ['Date', 'Type', 'Category', 'Entity', 'Details', 'Amount', 'Currency', 'Method', 'Operator'];
+    const rows = reportData.ledger.map(l => [
+      l.date,
+      l.type,
+      l.category,
+      l.entity.replace(/,/g, ' '),
+      l.details.replace(/,/g, ' '),
+      l.amount,
+      l.currency,
+      l.method,
+      l.operator
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `bahia_audit_ledger_${dateRange.start}.csv`;
+    link.click();
+  };
+
   return (
-    <div className="space-y-12 pb-32 animate-in fade-in duration-700">
-      {/* Financial Filter Bar */}
-      <div className="bg-white p-10 rounded-[3.5rem] shadow-sm border-2 border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-10">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-slate-950 rounded-[2rem] flex items-center justify-center text-white shadow-xl shadow-slate-200"><Scale className="w-8 h-8" /></div>
+    <div className="space-y-8 pb-32 animate-in fade-in duration-700">
+      {/* Accountant Module Header */}
+      <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-5">
+          <div className="w-14 h-14 bg-slate-950 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-slate-200"><Scale className="w-7 h-7" /></div>
           <div>
-            <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">Accountant Console</h2>
-            <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.4em] mt-3">Live Multi-Currency Audit</p>
+            <h2 className="text-2xl font-black text-slate-950 tracking-tighter uppercase leading-none">Financial Audit</h2>
+            <p className="text-slate-400 font-bold text-[9px] uppercase tracking-[0.3em] mt-2">Strategic Multi-Currency Ledger</p>
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="bg-slate-50 p-3 rounded-2xl flex items-center gap-4 border-2 border-slate-100">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="bg-slate-50 px-4 py-2 rounded-xl flex items-center gap-3 border border-slate-100">
              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="bg-transparent font-black text-xs text-slate-900 outline-none" />
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="bg-transparent font-black text-[11px] text-slate-900 outline-none" />
              </div>
              <span className="text-slate-300 font-black">→</span>
              <div className="flex items-center gap-2">
-                <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="bg-transparent font-black text-xs text-slate-900 outline-none" />
+                <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="bg-transparent font-black text-[11px] text-slate-900 outline-none" />
              </div>
           </div>
-          <button onClick={() => window.print()} className="flex items-center gap-3 bg-slate-950 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-xl"><Printer className="w-5 h-5" /> Generate PDF Audit</button>
+          <button onClick={exportLedgerCSV} className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md"><FileSpreadsheet className="w-4 h-4" /> Export Audit CSV</button>
         </div>
       </div>
 
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-         <div className="bg-emerald-600 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden group">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2">Realized Revenue</p>
-            <p className="text-4xl font-black mt-4 tracking-tighter">{totalInflowEGP.toLocaleString()} <span className="text-sm font-bold opacity-40">EGP EQ.</span></p>
-            <div className="mt-8 flex items-center justify-between text-[10px] font-black opacity-80 uppercase bg-black/10 p-4 rounded-2xl">
-              <div className="flex flex-col"><span>EGP</span><span className="text-lg">{reportData.collectedEGP.toLocaleString()}</span></div>
-              <div className="flex flex-col text-right"><span>USD</span><span className="text-lg">{reportData.collectedUSD.toLocaleString()}</span></div>
+      {/* High-Level Financial Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:border-emerald-500 transition-all">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-4">Total Inflow (EGP Eq.)</p>
+            <p className="text-3xl font-black text-slate-950 tracking-tighter leading-none">{totalInflowEGP.toLocaleString()} <span className="text-xs font-bold opacity-30">EGP</span></p>
+            <div className="mt-4 flex gap-2">
+              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[7px] font-black uppercase">{reportData.collectedUSD} USD Inflow</span>
             </div>
          </div>
 
-         <div className="bg-rose-600 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2">Debt / Pending</p>
-            <p className="text-4xl font-black mt-4 tracking-tighter">{totalPendingEGP.toLocaleString()} <span className="text-sm font-bold opacity-40">EGP EQ.</span></p>
-            <div className="mt-8 flex items-center justify-between text-[10px] font-black opacity-80 uppercase bg-black/10 p-4 rounded-2xl">
-              <div className="flex flex-col"><span>EGP</span><span className="text-lg">{reportData.pendingEGP.toLocaleString()}</span></div>
-              <div className="flex flex-col text-right"><span>USD</span><span className="text-lg">{reportData.pendingUSD.toLocaleString()}</span></div>
+         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:border-rose-500 transition-all">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-4">Total Outflow (EGP Eq.)</p>
+            <p className="text-3xl font-black text-slate-950 tracking-tighter leading-none">{totalOutflowEGP.toLocaleString()} <span className="text-xs font-bold opacity-30">EGP</span></p>
+            <div className="mt-4 flex gap-2">
+              <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-[7px] font-black uppercase">Incl. Staff Payroll</span>
             </div>
          </div>
 
-         <div className="bg-slate-950 p-10 rounded-[3.5rem] text-white shadow-2xl relative overflow-hidden group">
-            <p className="text-[10px] font-black uppercase tracking-widest opacity-40 flex items-center gap-2">Operational Outflow</p>
-            <p className="text-4xl font-black mt-4 tracking-tighter">{totalOutflowEGP.toLocaleString()} <span className="text-sm font-bold opacity-40">EGP EQ.</span></p>
-            <div className="mt-6 flex gap-4">
-              <span className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Fees & Repairs</span>
-            </div>
+         <div className="bg-slate-950 p-8 rounded-[2.5rem] text-white shadow-xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp className="w-20 h-20" /></div>
+            <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-4">Net Cash Position</p>
+            <p className="text-3xl font-black text-white tracking-tighter leading-none">{(totalInflowEGP - totalOutflowEGP).toLocaleString()} <span className="text-xs font-bold opacity-30">EGP</span></p>
          </div>
 
-         <div className="bg-sky-50 p-10 rounded-[3.5rem] border-2 border-sky-100 shadow-sm flex flex-col justify-between">
-            <div>
-               <p className="text-[10px] font-black uppercase tracking-widest text-sky-600">Services Revenue</p>
-               <p className="text-4xl font-black mt-4 text-sky-950 tracking-tighter">{reportData.servicesRevenueEGP.toLocaleString()} <span className="text-sm font-bold opacity-30 text-sky-950">EGP</span></p>
-            </div>
-            <div className="p-4 bg-sky-100 rounded-2xl">
-               <p className="text-[9px] font-black text-sky-800 uppercase tracking-widest">Cleaning & Amenity Sales</p>
-            </div>
+         <div className="bg-sky-50 p-8 rounded-[2.5rem] border border-sky-100 group hover:bg-sky-500 hover:border-sky-600 transition-all">
+            <p className="text-[9px] font-black uppercase tracking-widest text-sky-600 group-hover:text-white/60 mb-4">Total AR (Debts)</p>
+            <p className="text-3xl font-black text-sky-950 group-hover:text-white tracking-tighter leading-none">{totalPendingEGP.toLocaleString()} <span className="text-xs font-bold opacity-30">EGP</span></p>
          </div>
       </div>
 
-      {/* Detailed Transaction Ledger */}
-      <div className="bg-white rounded-[4rem] border-2 border-slate-200 shadow-2xl overflow-hidden">
-        <div className="p-10 border-b-2 border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50">
-           <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-slate-950 rounded-2xl flex items-center justify-center text-white"><History className="w-6 h-6" /></div>
-              <h3 className="text-2xl font-black uppercase text-slate-950 tracking-tighter">Unified Financial Ledger</h3>
+      {/* Unified Transaction Ledger */}
+      <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/50">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-950 rounded-xl flex items-center justify-center text-white"><History className="w-5 h-5" /></div>
+              <h3 className="text-lg font-black uppercase text-slate-950 tracking-tighter">Financial Stream</h3>
            </div>
            
-           <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200">
-             <button onClick={() => setActiveLedgerTab('all')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeLedgerTab === 'all' ? 'bg-slate-950 text-white' : 'text-slate-400'}`}>Full Stream</button>
-             <button onClick={() => setActiveLedgerTab('inflow')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeLedgerTab === 'inflow' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}>Inflow</button>
-             <button onClick={() => setActiveLedgerTab('outflow')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeLedgerTab === 'outflow' ? 'bg-rose-600 text-white' : 'text-slate-400'}`}>Outflow</button>
+           <div className="flex bg-white p-1 rounded-xl border border-slate-200">
+             <button onClick={() => setActiveLedgerTab('all')} className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeLedgerTab === 'all' ? 'bg-slate-950 text-white shadow-md' : 'text-slate-400'}`}>Full Stream</button>
+             <button onClick={() => setActiveLedgerTab('inflow')} className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeLedgerTab === 'inflow' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400'}`}>Inflow Only</button>
+             <button onClick={() => setActiveLedgerTab('outflow')} className={`px-5 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeLedgerTab === 'outflow' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400'}`}>Outflow Only</button>
            </div>
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left font-bold">
+          <table className="w-full text-left font-bold border-collapse">
              <thead>
-                <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-[0.2em] border-b">
-                   <th className="px-10 py-8">Timestamp</th>
-                   <th className="px-10 py-8">Class & Origin</th>
-                   <th className="px-10 py-8">Party & Narrative</th>
-                   <th className="px-10 py-8 text-right">Operator</th>
-                   <th className="px-10 py-8 text-right">Amount</th>
+                <tr className="bg-slate-50/30 text-slate-400 text-[8px] uppercase tracking-[0.2em] border-b border-slate-100">
+                   <th className="px-8 py-5">Value Date</th>
+                   <th className="px-8 py-5">Class</th>
+                   <th className="px-8 py-5">Party / Narration</th>
+                   <th className="px-8 py-5 text-right">Credit / Debit</th>
                 </tr>
              </thead>
-             <tbody className="divide-y divide-slate-100">
+             <tbody className="divide-y divide-slate-50">
                 {reportData.ledger.filter(l => activeLedgerTab === 'all' || l.type === activeLedgerTab.toUpperCase()).map(l => (
-                   <tr key={l.id} className="hover:bg-slate-50 transition-all">
-                      <td className="px-10 py-8">
-                         <p className="text-slate-950 font-black text-sm">{l.date}</p>
-                         <p className="text-[9px] font-bold text-slate-400 uppercase">Operational Date</p>
+                   <tr key={l.id} className="hover:bg-slate-50/80 transition-all text-[11px]">
+                      <td className="px-8 py-5">
+                         <p className="text-slate-900 font-black">{l.date}</p>
+                         <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">Op: {l.operator}</p>
                       </td>
-                      <td className="px-10 py-8">
-                         <div className="flex flex-col gap-1">
-                            <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase w-fit ${l.type === 'INFLOW' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{l.type}</span>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{l.category}</span>
-                         </div>
+                      <td className="px-8 py-5">
+                         <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase w-fit ${l.type === 'INFLOW' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{l.category}</span>
                       </td>
-                      <td className="px-10 py-8">
-                         <p className="text-slate-950 font-black text-base uppercase tracking-tighter">{l.entity}</p>
-                         <p className="text-[10px] font-bold text-slate-500 uppercase">{l.details}</p>
+                      <td className="px-8 py-5">
+                         <p className="text-slate-900 font-black uppercase tracking-tight truncate max-w-[200px]">{l.entity}</p>
+                         <p className="text-[9px] font-medium text-slate-400 truncate max-w-[250px]">{l.details}</p>
                       </td>
-                      <td className="px-10 py-8 text-right font-black text-xs text-slate-400">@{l.operator}</td>
-                      <td className="px-10 py-8 text-right">
-                         <p className={`text-2xl font-black tracking-tighter ${l.type === 'INFLOW' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <td className="px-8 py-5 text-right">
+                         <p className={`text-lg font-black tracking-tighter ${l.type === 'INFLOW' ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {l.type === 'INFLOW' ? '+' : '-'}{l.amount.toLocaleString()} 
-                            <span className="text-xs font-bold opacity-30 ml-2">{l.currency}</span>
+                            <span className="text-[8px] font-bold opacity-30 ml-1">{l.currency}</span>
                          </p>
-                         <p className="text-[9px] font-black opacity-30 uppercase">{l.method}</p>
                       </td>
                    </tr>
                 ))}

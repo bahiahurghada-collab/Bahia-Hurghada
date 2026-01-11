@@ -117,7 +117,7 @@ const Bookings: React.FC<BookingsProps> = ({
       bookingDate: todayStr,
       totalAmount: finance.total,
       paymentStatus: finance.remaining <= 0 ? 'Paid' : (formData.paidAmount > 0 ? 'Partial' : 'Unpaid'),
-      receptionistName: rest.receptionistName || userName // حفظ اسم الموظف
+      receptionistName: rest.receptionistName || userName
     };
 
     if (editingBookingId) onUpdateBooking(editingBookingId, bookingPayload);
@@ -168,7 +168,7 @@ const Bookings: React.FC<BookingsProps> = ({
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
-              placeholder="Filter folio by guest name..." 
+              placeholder="Search guests or folios..." 
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border-2 border-transparent focus:border-sky-500 outline-none font-bold text-[11px] transition-all"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
@@ -185,11 +185,11 @@ const Bookings: React.FC<BookingsProps> = ({
            <table className="w-full text-left">
              <thead className="bg-slate-50 border-b border-slate-100">
                <tr className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">
-                 <th className="px-6 py-3">Guest / Folio</th>
-                 <th className="px-6 py-3">Period</th>
-                 <th className="px-6 py-3">Staff</th>
+                 <th className="px-6 py-3">Folio ID / Guest</th>
+                 <th className="px-6 py-3">Stay Period</th>
+                 <th className="px-6 py-3">Operator</th>
                  <th className="px-6 py-3">Status</th>
-                 <th className="px-6 py-3 text-right">Balance</th>
+                 <th className="px-6 py-3 text-right">Accounting</th>
                  <th className="px-6 py-3 text-right">Actions</th>
                </tr>
              </thead>
@@ -200,8 +200,8 @@ const Bookings: React.FC<BookingsProps> = ({
                  return (
                    <tr key={b.id} className="hover:bg-slate-50 transition-all group text-[11px] font-bold">
                      <td className="px-6 py-3">
-                        <p className="font-black text-slate-900">{customer?.name || 'Unknown'}</p>
-                        <p className="text-[8px] text-sky-600 uppercase font-black">UNIT {apartment?.unitNumber} • {b.platform}</p>
+                        <p className="font-black text-slate-900">{customer?.name || 'Walk-in'}</p>
+                        <p className="text-[8px] text-sky-600 uppercase font-black">U-{apartment?.unitNumber} • {b.platform}</p>
                      </td>
                      <td className="px-6 py-3 text-[10px] text-slate-500 font-black">
                         {b.startDate} <span className="text-slate-300">→</span> {b.endDate}
@@ -221,7 +221,7 @@ const Bookings: React.FC<BookingsProps> = ({
                      <td className="px-6 py-3 text-right">
                         <p className="font-black text-slate-900">{b.totalAmount.toLocaleString()} {b.currency}</p>
                         <p className={`text-[8px] font-black uppercase ${b.totalAmount - b.paidAmount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                           {b.totalAmount - b.paidAmount > 0 ? `Due: ${(b.totalAmount - b.paidAmount).toLocaleString()}` : 'Cleared'}
+                           {b.totalAmount - b.paidAmount > 0 ? `Due: ${(b.totalAmount - b.paidAmount).toLocaleString()}` : 'Settled'}
                         </p>
                      </td>
                      <td className="px-6 py-3 text-right">
@@ -245,8 +245,8 @@ const Bookings: React.FC<BookingsProps> = ({
                <div className="flex items-center gap-3">
                   <div className="p-2 bg-slate-950 rounded-xl text-white shadow-lg"><ConciergeBell className="w-5 h-5" /></div>
                   <div>
-                    <h3 className="text-lg font-black text-slate-950 tracking-tighter uppercase leading-none">{editingBookingId ? 'Modify Reservation' : 'New Guest Folio'}</h3>
-                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">Operator: {formData.receptionistName}</p>
+                    <h3 className="text-lg font-black text-slate-950 tracking-tighter uppercase leading-none">{editingBookingId ? 'Modify Folio' : 'New Guest Folio'}</h3>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">Responsible: {formData.receptionistName}</p>
                   </div>
                </div>
                <button onClick={closeModal} className="p-2 hover:bg-slate-200 rounded-full transition-all text-slate-950"><X className="w-8 h-8" /></button>
@@ -255,21 +255,21 @@ const Bookings: React.FC<BookingsProps> = ({
             <form onSubmit={handleFormSubmit} className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
-                {/* Section: Guest & Units */}
+                {/* Guest Details */}
                 <div className="lg:col-span-2 space-y-6">
                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-4">
-                     <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><UserIcon className="w-3 h-3 text-sky-500" /> Guest Information</h4>
+                     <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><UserIcon className="w-3 h-3 text-sky-500" /> Guest Identity</h4>
                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Full Name</label>
+                          <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Full Guest Name</label>
                           <input required className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-xs" value={formData.newCustomer.name} onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, name: e.target.value }})} />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Phone Number</label>
+                          <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Contact Phone</label>
                           <input required className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-xs" value={formData.newCustomer.phone} onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, phone: e.target.value }})} />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Email Address</label>
+                          <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Email (Optional)</label>
                           <input className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-xs" type="email" value={formData.newCustomer.email} onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, email: e.target.value }})} />
                         </div>
                         <div className="space-y-1">
@@ -283,8 +283,8 @@ const Bookings: React.FC<BookingsProps> = ({
 
                    <div className="p-6 bg-white rounded-[2rem] border border-slate-200 space-y-4 shadow-sm">
                      <div className="flex justify-between items-center">
-                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building className="w-3 h-3 text-sky-500" /> Stay Details</h4>
-                        {/* Maintenance Switch */}
+                        <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Building className="w-3 h-3 text-sky-500" /> Stay Parameters</h4>
+                        {/* Maintenance Toggle */}
                         <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 rounded-lg border border-amber-100">
                            <span className="text-[8px] font-black text-amber-700 uppercase">Set Maintenance</span>
                            <input type="checkbox" checked={formData.status === 'maintenance'} onChange={e => setFormData({...formData, status: e.target.checked ? 'maintenance' : 'confirmed'})} className="w-4 h-4 accent-amber-600" />
@@ -292,21 +292,21 @@ const Bookings: React.FC<BookingsProps> = ({
                      </div>
                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1 col-span-2">
-                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Select Unit</label>
+                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Unit Assignment</label>
                            <select required className="w-full p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-xs" value={formData.apartmentId} onChange={e => setFormData({ ...formData, apartmentId: e.target.value })}>
                              <option value="">Choose Room...</option>
                              {state.apartments.map(a => <option key={a.id} value={a.id}>U-{a.unitNumber} ({a.view})</option>)}
                            </select>
                         </div>
                         <div className="space-y-1">
-                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Check-In</label>
+                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Check-In Date & Time</label>
                            <div className="flex gap-2">
                               <input type="date" className="flex-1 p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-[11px]" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
                               <input type="time" className="w-24 p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-[11px]" value={formData.checkInTime} onChange={e => setFormData({...formData, checkInTime: e.target.value})} />
                            </div>
                         </div>
                         <div className="space-y-1">
-                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Check-Out</label>
+                           <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Check-Out Date & Time</label>
                            <div className="flex gap-2">
                               <input type="date" className="flex-1 p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-[11px]" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
                               <input type="time" className="w-24 p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-[11px]" value={formData.checkOutTime} onChange={e => setFormData({...formData, checkOutTime: e.target.value})} />
@@ -315,8 +315,9 @@ const Bookings: React.FC<BookingsProps> = ({
                      </div>
                    </div>
 
+                   {/* Amenity Selection with Pricing */}
                    <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-4">
-                     <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Zap className="w-3 h-3 text-sky-500" /> Extra Services</h4>
+                     <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2"><Zap className="w-3 h-3 text-sky-500" /> Additional Amenities</h4>
                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                         {state.services.map(s => (
                            <button key={s.id} type="button" onClick={() => toggleService(s.id)} className={`p-3 rounded-xl border-2 transition-all flex flex-col items-start gap-1 ${formData.selectedServiceIds.includes(s.id) ? 'bg-sky-500 border-sky-600 text-white shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-sky-200'}`}>
@@ -331,28 +332,29 @@ const Bookings: React.FC<BookingsProps> = ({
                    </div>
                 </div>
 
-                {/* Section: Folio Summary */}
+                {/* Accounting & Folio Summary */}
                 <div className="space-y-6">
-                   <div className="bg-slate-950 p-8 rounded-[2.5rem] text-white shadow-2xl border-b-8 border-sky-500">
-                      <p className="text-[9px] font-black text-sky-400 uppercase tracking-widest mb-1 flex items-center gap-2">Folio Total <CreditCard className="w-3 h-3" /></p>
+                   <div className="bg-slate-950 p-8 rounded-[2.5rem] text-white shadow-2xl border-b-8 border-sky-500 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard className="w-24 h-24" /></div>
+                      <p className="text-[9px] font-black text-sky-400 uppercase tracking-widest mb-1">Folio Grand Total</p>
                       <h2 className="text-4xl font-black tracking-tighter">{finance.total.toLocaleString()} <span className="text-xs opacity-30 uppercase">{formData.currency}</span></h2>
                       
-                      <div className="mt-6 space-y-2 pt-4 border-t border-white/10">
+                      <div className="mt-6 space-y-2 pt-4 border-t border-white/10 relative z-10">
                          <div className="flex justify-between text-[9px] font-black uppercase opacity-50">
-                            <span>Stay ({finance.nights} Nights)</span>
+                            <span>Stay Cost ({finance.nights} N)</span>
                             <span>{finance.total - finance.servicesCost} {formData.currency}</span>
                          </div>
                          <div className="flex justify-between text-[9px] font-black uppercase opacity-50">
-                            <span>Amenities Cost</span>
+                            <span>Amenities</span>
                             <span>{finance.servicesCost} {formData.currency}</span>
                          </div>
                          <div className="flex justify-between text-[11px] font-black uppercase text-rose-400 mt-2">
-                            <span>Due Balance</span>
+                            <span>Current Balance</span>
                             <span>{finance.remaining.toLocaleString()} {formData.currency}</span>
                          </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 mt-6">
+                      <div className="grid grid-cols-2 gap-2 mt-6 relative z-10">
                          <select className="bg-white/5 border border-white/10 p-2.5 rounded-xl font-black text-[10px] outline-none cursor-pointer" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value as Currency})}>
                            {CURRENCIES.map(c => <option key={c} value={c} className="text-slate-900">{c}</option>)}
                          </select>
@@ -361,31 +363,32 @@ const Bookings: React.FC<BookingsProps> = ({
                          </select>
                       </div>
 
-                      <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                         <label className="text-[9px] font-black text-emerald-400 uppercase block mb-1">Enter Paid Amount</label>
-                         <input type="number" className="w-full bg-transparent border-none p-0 text-white font-black text-3xl outline-none placeholder:text-emerald-900" placeholder="0.00" value={formData.paidAmount || ''} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} />
+                      <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl relative z-10">
+                         <label className="text-[9px] font-black text-emerald-400 uppercase block mb-1">Manual Payment Input</label>
+                         <input type="number" className="w-full bg-transparent border-none p-0 text-white font-black text-3xl outline-none placeholder:text-emerald-900/50" placeholder="0.00" value={formData.paidAmount || ''} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} />
                       </div>
                    </div>
 
+                   {/* Commisions & Channel Tracking */}
                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] space-y-4">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Percent className="w-3 h-3" /> Staff Commission</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Percent className="w-3 h-3 text-rose-500" /> Sales Commission</label>
                         <input type="number" placeholder="Enter amount..." className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-xs text-rose-600" value={formData.commissionAmount || ''} onChange={e => setFormData({...formData, commissionAmount: Number(e.target.value)})} />
                       </div>
                       
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Current Status</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Current Folio Status</label>
                         <select className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-[10px] uppercase" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as BookingStatus})}>
-                          <option value="confirmed">Confirmed / Up-coming</option>
-                          <option value="stay">Check-In / Active</option>
-                          <option value="checked_out">Check-Out / Closed</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="stay">Active Stay</option>
+                          <option value="checked_out">Closed / Out</option>
                           <option value="cancelled">Cancelled</option>
                           <option value="maintenance">Maintenance</option>
                         </select>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Globe className="w-3 h-3" /> Channel Source</label>
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Booking Channel</label>
                         <select className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-[10px]" value={formData.platform} onChange={e => setFormData({...formData, platform: e.target.value})}>
                            {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
@@ -395,13 +398,13 @@ const Bookings: React.FC<BookingsProps> = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-[0.2em] flex items-center gap-2"><StickyNote className="w-3 h-3" /> Folio Internal Notes</label>
-                <textarea rows={2} className="w-full p-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 font-bold text-xs outline-none focus:border-sky-500 transition-all" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Room preferences, special guest requests, etc..." />
+                <label className="text-[9px] font-black text-slate-400 uppercase ml-4 tracking-[0.2em] flex items-center gap-2"><StickyNote className="w-3 h-3" /> Internal Folio Notes</label>
+                <textarea rows={2} className="w-full p-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 font-bold text-xs outline-none focus:border-sky-500 transition-all" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Room preferences, breakfast notes, etc..." />
               </div>
 
               <div className="flex gap-4">
                  <button onClick={closeModal} type="button" className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-all">Cancel</button>
-                 <button type="submit" className="flex-[2] py-4 bg-slate-950 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-sky-500 transition-all border-b-4 border-slate-900">Confirm Folio Record</button>
+                 <button type="submit" className="flex-[2] py-4 bg-slate-950 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl hover:bg-sky-500 transition-all border-b-4 border-slate-900">Finalize Record</button>
               </div>
             </form>
           </div>
