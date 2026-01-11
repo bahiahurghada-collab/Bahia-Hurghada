@@ -245,7 +245,7 @@ const App: React.FC = () => {
                  <div className="bg-sky-500/10 p-6 rounded-3xl border border-sky-500/20">
                     <h4 className="text-sky-400 font-black text-[10px] uppercase tracking-widest mb-3">Action Required:</h4>
                     <ol className="text-xs text-slate-400 space-y-2 list-decimal ml-4 font-bold">
-                      <li>Go to <span className="text-sky-300">Supabase > Settings > API</span></li>
+                      <li>Go to <span className="text-sky-300">Supabase &gt; Settings &gt; API</span></li>
                       <li>Check your <span className="text-sky-300">URL</span> and <span className="text-sky-300">Key</span></li>
                     </ol>
                  </div>
