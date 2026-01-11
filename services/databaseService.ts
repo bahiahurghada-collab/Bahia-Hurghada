@@ -1,12 +1,33 @@
 
 import { AppState } from "../types";
-import { supabase } from "./supabaseClient";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
+
+/**
+ * دالة مساعدة لتحويل أي خطأ إلى نص مفهوم
+ */
+const parseSupabaseError = (error: any): string => {
+  if (!error) return "Unknown Error";
+  if (typeof error === 'string') return error;
+  
+  const code = error.code;
+  const message = error.message || "";
+
+  // التعامل مع خطأ RLS الشهير
+  if (code === '42501') {
+    return "RLS Permission Error (42501): Please go to Supabase SQL Editor and run: ALTER TABLE pms_data DISABLE ROW LEVEL SECURITY;";
+  }
+
+  // استخراج الرسالة من كائن خطأ Supabase
+  const msg = message || error.details || error.hint || JSON.stringify(error);
+  const codePrefix = code ? `[Code: ${code}] ` : "";
+  
+  return `${codePrefix}${msg}`;
+};
 
 export const databaseService = {
-  /**
-   * جلب الحالة الكاملة من جدول pms_data في Supabase
-   */
   fetchState: async (currentLastUpdated?: string): Promise<{ state: AppState, hasUpdates: boolean } | null> => {
+    if (!isSupabaseConfigured()) return null;
+
     try {
       const { data, error } = await supabase
         .from('pms_data')
@@ -15,33 +36,28 @@ export const databaseService = {
         .single();
 
       if (error) {
-        // إذا كان الخطأ هو عدم وجود بيانات (الصف غير موجود)
         if (error.code === 'PGRST116') {
-          console.warn("Database is empty, initializing first record...");
+          console.warn("Table pms_data is empty or ID 1 missing.");
           return null;
         }
-        throw error;
+        const errorText = parseSupabaseError(error);
+        throw new Error(errorText);
       }
 
       if (!data || !data.state) return null;
 
       const cloudState: AppState = data.state;
-      
-      // التحقق من التوقيت لمنع إعادة تحميل نفس البيانات
       const hasUpdates = !currentLastUpdated || (cloudState.lastUpdated || '') > currentLastUpdated;
       
       return { state: cloudState, hasUpdates };
-    } catch (e) {
-      console.error("Supabase Connection Error:", e);
-      // في حالة وجود خطأ في الشبكة، نبلغ النظام ليتعامل معه
-      return null;
+    } catch (e: any) {
+      throw e; // نمرر الخطأ ليتم عرضه في الواجهة
     }
   },
 
-  /**
-   * حفظ الحالة في السيرفر
-   */
   saveState: async (state: AppState): Promise<boolean> => {
+    if (!isSupabaseConfigured()) return false;
+
     try {
       const stateToSave: AppState = {
         ...state,
@@ -52,11 +68,15 @@ export const databaseService = {
         .from('pms_data')
         .upsert({ id: 1, state: stateToSave });
 
-      if (error) throw error;
+      if (error) {
+        const errorText = parseSupabaseError(error);
+        throw new Error(errorText);
+      }
+      
       return true;
-    } catch (e) {
-      console.error("Supabase Sync Failed:", e);
-      return false;
+    } catch (e: any) {
+      console.error("Sync Failure Details:", e.message);
+      throw e;
     }
   }
 };

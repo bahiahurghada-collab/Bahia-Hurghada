@@ -14,7 +14,8 @@ import CommissionManagement from './components/CommissionManagement';
 import SystemLogs from './components/SystemLogs';
 import { databaseService } from './services/databaseService';
 import { storageService } from './services/storageService';
-import { Loader2, CloudOff, Wifi } from 'lucide-react';
+import { isSupabaseConfigured } from './services/supabaseClient';
+import { Loader2, CloudOff, AlertCircle, Settings, Database, Link, Key, Copy, Check } from 'lucide-react';
 
 const INITIAL_SERVICES: ExtraService[] = [
   { id: 's1', name: 'Standard Cleaning', price: 200, isFree: false },
@@ -44,7 +45,8 @@ const App: React.FC = () => {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-  const [syncError, setSyncError] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loginUsername, setLoginUsername] = useState('');
@@ -60,49 +62,54 @@ const App: React.FC = () => {
 
   const [state, setState] = useState<AppState>(INITIAL_STATE);
 
-  // المزامنة اليدوية والقسرية
   const performSync = useCallback(async (forceUpdate: boolean = false) => {
-    if (isSyncing) return;
+    if (isSyncing || !isSupabaseConfigured()) return;
     setIsSyncing(true);
-    setSyncError(false);
+    setSyncError(null);
     
     try {
       if (forceUpdate) {
         const success = await databaseService.saveState(state);
-        if (success) setLastSyncTime(new Date());
-        else setSyncError(true);
+        if (success) {
+          setLastSyncTime(new Date());
+          setSyncError(null);
+        }
       } else {
         const result = await databaseService.fetchState(state.lastUpdated);
         if (result && result.hasUpdates) {
           setState(result.state);
           setLastSyncTime(new Date());
         } else if (!result && !state.lastUpdated) {
-          // إذا كان السيرفر فارغاً تماماً، نرفع الحالة الأولية
           await databaseService.saveState(INITIAL_STATE);
         }
       }
-    } catch (error) {
-      setSyncError(true);
+    } catch (error: any) {
+      setSyncError(error.message || "Connection Error");
     } finally {
       setIsSyncing(false);
     }
   }, [state, isSyncing]);
 
-  // التحميل الأول عند فتح التطبيق
   useEffect(() => {
     const init = async () => {
+      if (!isSupabaseConfigured()) {
+        setIsInitialLoading(false);
+        return;
+      }
       try {
         const result = await databaseService.fetchState();
         if (result) {
           setState(result.state);
+          setLastSyncTime(new Date());
         } else {
-          // إذا لم يجد بيانات، يحاول حفظ الحالة الأولية
-          await databaseService.saveState(INITIAL_STATE);
-          setState(INITIAL_STATE);
+          const success = await databaseService.saveState(INITIAL_STATE);
+          if (success) {
+             setState(INITIAL_STATE);
+             setLastSyncTime(new Date());
+          }
         }
-        setLastSyncTime(new Date());
-      } catch (e) {
-        setSyncError(true);
+      } catch (e: any) {
+        setSyncError(e.message || "Failed to initialize");
       } finally {
         setIsInitialLoading(false);
       }
@@ -110,9 +117,8 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // إعداد الـ Auto-Polling كل 30 ثانية
   useEffect(() => {
-    if (isInitialLoading || !user) return;
+    if (isInitialLoading || !user || !isSupabaseConfigured()) return;
     
     syncTimerRef.current = setInterval(() => {
       performSync(false);
@@ -122,6 +128,12 @@ const App: React.FC = () => {
       if (syncTimerRef.current) clearInterval(syncTimerRef.current);
     };
   }, [isInitialLoading, user, performSync]);
+
+  const copyFixCode = () => {
+    navigator.clipboard.writeText("ALTER TABLE pms_data DISABLE ROW LEVEL SECURITY;");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const addLog = useCallback((action: string, details: string) => {
     const newLog: AuditLog = {
@@ -136,11 +148,17 @@ const App: React.FC = () => {
 
   const handleStateUpdate = useCallback((newState: AppState) => {
     setState(newState);
+    if (!isSupabaseConfigured()) return;
     setIsSyncing(true);
     databaseService.saveState(newState).then((success) => {
       setIsSyncing(false);
-      if (success) setLastSyncTime(new Date());
-      else setSyncError(true);
+      if (success) {
+        setLastSyncTime(new Date());
+        setSyncError(null);
+      }
+    }).catch(err => {
+      setIsSyncing(false);
+      setSyncError(err.message);
     });
   }, []);
 
@@ -174,8 +192,67 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center gap-6">
           <Loader2 className="w-16 h-16 text-sky-500 animate-spin" />
           <div className="space-y-2">
-            <p className="text-sky-400 font-black text-xs uppercase tracking-[0.4em] animate-pulse">Syncing with Supabase Cloud...</p>
-            <p className="text-slate-500 font-bold text-[10px] uppercase">Connecting to Project Hub</p>
+            <p className="text-sky-400 font-black text-xs uppercase tracking-[0.4em] animate-pulse">Initializing System...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isSupabaseConfigured() || (syncError && (syncError.includes("fetch") || syncError.includes("42501")))) {
+    const isRLS = syncError?.includes("42501");
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6">
+        <div className="w-full max-w-2xl bg-white/5 border border-white/10 rounded-[3rem] p-12 backdrop-blur-3xl shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Database className="w-40 h-40 text-sky-500" />
+          </div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-4 mb-8">
+              <div className={`w-14 h-14 ${isRLS ? 'bg-amber-500/20' : 'bg-rose-500/20'} rounded-2xl flex items-center justify-center`}>
+                <AlertCircle className={`w-8 h-8 ${isRLS ? 'text-amber-500' : 'text-rose-500'}`} />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">
+                  {isRLS ? "Permission Needed" : "Connection Required"}
+                </h2>
+                <p className="text-slate-500 font-bold text-[10px] uppercase tracking-widest mt-2">Supabase Sync Error</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+               <div className="p-8 bg-rose-500/10 rounded-[2rem] border border-rose-500/20">
+                  <p className="text-[10px] font-black text-rose-500 uppercase mb-2">Error Details:</p>
+                  <p className="text-rose-200 font-mono text-sm leading-relaxed">
+                    {syncError || "Configuration issue detected."}
+                  </p>
+               </div>
+
+               {isRLS ? (
+                 <div className="bg-amber-500/10 p-6 rounded-3xl border border-amber-500/20">
+                    <h4 className="text-amber-400 font-black text-[10px] uppercase tracking-widest mb-4">Fix Instructions:</h4>
+                    <p className="text-xs text-slate-400 font-bold mb-4">You need to disable RLS on the table to allow the app to save data:</p>
+                    <div className="bg-black/40 p-4 rounded-xl flex items-center justify-between group">
+                       <code className="text-xs text-amber-200 font-mono">ALTER TABLE pms_data DISABLE ROW LEVEL SECURITY;</code>
+                       <button onClick={copyFixCode} className="p-2 hover:bg-white/10 rounded-lg transition-all text-amber-400">
+                          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                       </button>
+                    </div>
+                    <p className="text-[9px] text-slate-500 mt-4 font-bold">Copy this and run it in Supabase SQL Editor.</p>
+                 </div>
+               ) : (
+                 <div className="bg-sky-500/10 p-6 rounded-3xl border border-sky-500/20">
+                    <h4 className="text-sky-400 font-black text-[10px] uppercase tracking-widest mb-3">Action Required:</h4>
+                    <ol className="text-xs text-slate-400 space-y-2 list-decimal ml-4 font-bold">
+                      <li>Go to <span className="text-sky-300">Supabase > Settings > API</span></li>
+                      <li>Check your <span className="text-sky-300">URL</span> and <span className="text-sky-300">Key</span></li>
+                    </ol>
+                 </div>
+               )}
+               
+               <button onClick={() => window.location.reload()} className="w-full bg-white text-slate-950 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-sky-500 hover:text-white transition-all">Retry Connection</button>
+            </div>
           </div>
         </div>
       </div>
@@ -205,7 +282,7 @@ const App: React.FC = () => {
           {syncError && (
              <div className="mt-8 flex items-center justify-center gap-2 text-rose-400 animate-pulse">
                 <CloudOff className="w-4 h-4" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Offline Mode Active</span>
+                <span className="text-[9px] font-black uppercase tracking-widest">{syncError}</span>
              </div>
           )}
         </div>
