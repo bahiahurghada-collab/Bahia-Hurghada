@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  Building2, Wallet, Layers, Download, BarChart3, Radio, Zap, ShoppingCart, Search, Printer, Calendar, Filter, ArrowUpRight, TrendingUp
+  Building2, Wallet, Layers, Download, BarChart3, Radio, Zap, ShoppingCart, Search, Printer, Calendar, Filter, ArrowUpRight, TrendingUp, FileSpreadsheet, Calculator, Landmark
 } from 'lucide-react';
 import { AppState, Currency } from '../types';
 import { PAYMENT_METHODS, PLATFORMS } from '../constants';
@@ -62,7 +62,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       const amountEGP = e.currency === 'USD' ? e.amount * (state.currentExchangeRate || 50) : e.amount;
       data.expenseStats.total += amountEGP;
       if (e.apartmentId && data.unitStats[e.apartmentId]) data.unitStats[e.apartmentId].exp += amountEGP;
-      data.transactions.push({ date: e.date, ref: e.description, entity: 'Operational', type: 'OUT', amount: e.amount, currency: e.currency, unit: e.apartmentId ? state.apartments.find(a => a.id === e.apartmentId)?.unitNumber : 'Gen' });
+      data.transactions.push({ date: e.date, ref: e.description, entity: 'Operational Outflow', type: 'OUT', amount: e.amount, currency: e.currency, unit: e.apartmentId ? state.apartments.find(a => a.id === e.apartmentId)?.unitNumber : 'General' });
     });
 
     return data;
@@ -73,81 +73,88 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `bahia_finance_${type}_${dateRange.start}.csv`;
+    link.download = `bahia_audit_${type}_${dateRange.start}.csv`;
     link.click();
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-24 font-bold">
       
-      {/* Smart Control Header */}
-      <div className="bg-white p-8 rounded-[3.5rem] shadow-xl border-b-8 border-slate-950 flex flex-col lg:flex-row justify-between items-center gap-6 no-print">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 bg-slate-950 rounded-[2rem] flex items-center justify-center text-white shadow-2xl">
-            <BarChart3 className="w-8 h-8 text-sky-400" />
+      {/* Smart Control Header - Professional Style */}
+      <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border-4 border-slate-950 flex flex-col lg:flex-row justify-between items-center gap-8 no-print">
+        <div className="flex items-center gap-6">
+          <div className="w-20 h-20 bg-slate-950 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl">
+            <BarChart3 className="w-10 h-10 text-sky-400" />
           </div>
           <div>
-            <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Financial Intelligence</h2>
-            <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.4em] mt-2 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> BAHIA AUDIT ENGINE V22.5
+            <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">Financial Audit Control</h2>
+            <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.5em] mt-3 flex items-center gap-3">
+              <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span> BAHIA ACCOUNTING HUB V19.0 PRO
             </p>
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <div className="bg-slate-50 px-5 py-3 rounded-2xl flex items-center gap-4 border border-slate-200 shadow-inner">
-             <Calendar className="w-4 h-4 text-slate-400" />
-             <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="bg-transparent text-xs outline-none" />
-             <span className="text-slate-300">→</span>
-             <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="bg-transparent text-xs outline-none" />
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <div className="bg-slate-50 px-6 py-4 rounded-3xl flex items-center gap-6 border-2 border-slate-200 shadow-inner">
+             <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="bg-transparent text-xs outline-none font-black text-slate-950" />
+             </div>
+             <span className="text-slate-300 font-black">→</span>
+             <div className="flex items-center gap-2">
+                <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="bg-transparent text-xs outline-none font-black text-slate-950" />
+             </div>
           </div>
-          <button onClick={() => window.print()} className="bg-slate-950 text-white px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-2 hover:bg-sky-500 transition-all">
-            <Printer className="w-4 h-4" /> Export PDF
+          <button onClick={() => window.print()} className="bg-slate-950 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl flex items-center gap-3 hover:bg-sky-600 transition-all border-b-4 border-slate-800">
+            <Printer className="w-4 h-4" /> Export Ledger PDF
           </button>
         </div>
       </div>
 
-      {/* Modern Navigation */}
-      <div className="flex flex-wrap gap-2 p-2 bg-white border border-slate-200 rounded-[2.5rem] w-fit mx-auto shadow-sm no-print">
+      {/* Modern High-Contrast Navigation */}
+      <div className="flex flex-wrap gap-2 p-2 bg-slate-950 border-2 border-slate-900 rounded-[3rem] w-fit mx-auto shadow-2xl no-print">
          {[
-           { id: 'TREASURY', label: 'Treasury', icon: Wallet },
+           { id: 'TREASURY', label: 'Vault Status', icon: Landmark },
            { id: 'UNITS', label: 'Unit Profits', icon: Building2 },
-           { id: 'CHANNELS', label: 'Channels', icon: Radio },
-           { id: 'EXPENSES', label: 'Expenses', icon: ShoppingCart },
+           { id: 'CHANNELS', label: 'Channel Index', icon: Radio },
+           { id: 'EXPENSES', label: 'OpEx Ledger', icon: ShoppingCart },
            { id: 'LEDGER', label: 'Master Journal', icon: Layers }
          ].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${activeTab === t.id ? 'bg-slate-950 text-white shadow-xl scale-105' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
+            <button key={t.id} onClick={() => setActiveTab(t.id as any)} className={`px-10 py-4 rounded-3xl text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-3 ${activeTab === t.id ? 'bg-white text-slate-950 shadow-xl scale-105' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
                <t.icon className="w-4 h-4" /> {t.label}
             </button>
          ))}
       </div>
 
-      {/* Professional Data Tables */}
-      <div className="animate-in slide-in-from-bottom-4 duration-500">
+      {/* Accounting Data Matrix */}
+      <div className="animate-in slide-in-from-bottom-6 duration-700">
          
          {activeTab === 'TREASURY' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden">
-               <div className="p-8 bg-slate-950 text-white flex justify-between items-center">
-                  <h3 className="text-xl font-black uppercase tracking-tighter">Treasury Liquidity Table</h3>
-                  <button onClick={() => exportCSV('treasury', ['Method', 'USD', 'EGP'], Object.entries(finance.treasury).map(([k,v]) => [k, v.usd, v.egp]))} className="text-[10px] font-black uppercase bg-white/10 px-4 py-2 rounded-xl hover:bg-sky-500 transition-all flex items-center gap-2"><Download className="w-3 h-3"/> CSV</button>
+            <div className="bg-white rounded-[4rem] border-4 border-slate-950 shadow-2xl overflow-hidden">
+               <div className="p-10 bg-slate-950 text-white flex justify-between items-center border-b-4 border-sky-500">
+                  <div className="flex items-center gap-4">
+                     <div className="p-3 bg-white/10 rounded-2xl"><Wallet className="w-6 h-6 text-sky-400" /></div>
+                     <h3 className="text-2xl font-black uppercase tracking-tighter">Treasury Liquidity Distribution</h3>
+                  </div>
+                  <button onClick={() => exportCSV('treasury', ['Method', 'USD', 'EGP', 'TotalEGP'], Object.entries(finance.treasury).map(([k,v]) => [k, v.usd, v.egp, (v.egp + (v.usd * state.currentExchangeRate))]))} className="text-[10px] font-black uppercase bg-white/10 px-6 py-3 rounded-2xl hover:bg-sky-500 transition-all flex items-center gap-3 border border-white/10"><FileSpreadsheet className="w-4 h-4"/> Download CSV Matrix</button>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left font-bold">
                      <thead>
-                        <tr className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b">
-                           <th className="px-10 py-6">Method</th>
-                           <th className="px-10 py-6 text-right">USD Assets</th>
-                           <th className="px-10 py-6 text-right">EGP Assets</th>
-                           <th className="px-10 py-6 text-right">Normalized Total (EGP)</th>
+                        <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b-2 border-slate-100">
+                           <th className="px-12 py-8">Payment Instrument</th>
+                           <th className="px-12 py-8 text-right">USD Collected</th>
+                           <th className="px-12 py-8 text-right">EGP Collected</th>
+                           <th className="px-12 py-8 text-right">Settlement Value (EGP)</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-slate-50">
+                     <tbody className="divide-y divide-slate-100">
                         {Object.entries(finance.treasury).map(([method, val]) => (
-                           <tr key={method} className="hover:bg-slate-50 transition-all text-xs">
-                              <td className="px-10 py-6 uppercase">{method}</td>
-                              <td className="px-10 py-6 text-right text-sky-600">{val.usd.toLocaleString()} <span className="text-[9px] opacity-40">USD</span></td>
-                              <td className="px-10 py-6 text-right text-emerald-600">{val.egp.toLocaleString()} <span className="text-[9px] opacity-40">EGP</span></td>
-                              <td className="px-10 py-6 text-right text-slate-950 font-black">{(val.egp + (val.usd * (state.currentExchangeRate || 50))).toLocaleString()} EGP</td>
+                           <tr key={method} className="hover:bg-slate-50 transition-all text-sm">
+                              <td className="px-12 py-8 uppercase text-slate-950 font-black">{method}</td>
+                              <td className="px-12 py-8 text-right text-sky-600 font-black">{val.usd.toLocaleString()} <span className="text-[10px] opacity-40">USD</span></td>
+                              <td className="px-12 py-8 text-right text-emerald-600 font-black">{val.egp.toLocaleString()} <span className="text-[10px] opacity-40">EGP</span></td>
+                              <td className="px-12 py-8 text-right text-slate-950 font-black text-lg">{(val.egp + (val.usd * (state.currentExchangeRate || 50))).toLocaleString()} £</td>
                            </tr>
                         ))}
                      </tbody>
@@ -157,33 +164,36 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
          )}
 
          {activeTab === 'UNITS' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden">
-               <div className="p-8 bg-slate-950 text-white flex justify-between items-center">
-                  <h3 className="text-xl font-black uppercase tracking-tighter">Asset Profitability Matrix</h3>
-                  <button onClick={() => exportCSV('unit_profits', ['Unit', 'Bookings', 'Rev', 'Exp', 'Net'], state.apartments.map(a => [a.unitNumber, finance.unitStats[a.id].bookings, finance.unitStats[a.id].stayRev, finance.unitStats[a.id].exp, (finance.unitStats[a.id].stayRev - finance.unitStats[a.id].exp)]))} className="text-[10px] font-black uppercase bg-white/10 px-4 py-2 rounded-xl hover:bg-sky-500 transition-all flex items-center gap-2"><Download className="w-3 h-3"/> CSV</button>
+            <div className="bg-white rounded-[4rem] border-4 border-slate-950 shadow-2xl overflow-hidden">
+               <div className="p-10 bg-slate-950 text-white flex justify-between items-center border-b-4 border-emerald-500">
+                  <div className="flex items-center gap-4">
+                     <div className="p-3 bg-white/10 rounded-2xl"><Building2 className="w-6 h-6 text-emerald-400" /></div>
+                     <h3 className="text-2xl font-black uppercase tracking-tighter">Portfolio Unit Profitability</h3>
+                  </div>
+                  <button onClick={() => exportCSV('unit_profits', ['Unit', 'Nights', 'GrossRev', 'OpEx', 'NetMargin'], state.apartments.map(a => [a.unitNumber, finance.unitStats[a.id].nights, finance.unitStats[a.id].stayRev, finance.unitStats[a.id].exp, (finance.unitStats[a.id].stayRev - finance.unitStats[a.id].exp)]))} className="text-[10px] font-black uppercase bg-white/10 px-6 py-3 rounded-2xl hover:bg-sky-500 transition-all flex items-center gap-3 border border-white/10"><FileSpreadsheet className="w-4 h-4"/> CSV Export</button>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left font-bold">
                      <thead>
-                        <tr className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b">
-                           <th className="px-10 py-6">Unit</th>
-                           <th className="px-10 py-6 text-right">Volume</th>
-                           <th className="px-10 py-6 text-right">Stay Rev (EGP)</th>
-                           <th className="px-10 py-6 text-right">OpEx (EGP)</th>
-                           <th className="px-10 py-6 text-right">Net Margin</th>
+                        <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 border-b-2 border-slate-100">
+                           <th className="px-12 py-8">Unit Asset</th>
+                           <th className="px-12 py-8 text-right">Occupied Nights</th>
+                           <th className="px-12 py-8 text-right">Gross Revenue (EGP)</th>
+                           <th className="px-12 py-8 text-right">OpEx Deductions</th>
+                           <th className="px-12 py-8 text-right">Net Portfolio Margin</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-slate-50">
+                     <tbody className="divide-y divide-slate-100">
                         {state.apartments.map(apt => {
                            const s = finance.unitStats[apt.id];
                            const net = s.stayRev - s.exp;
                            return (
-                              <tr key={apt.id} className="hover:bg-slate-50 transition-all text-xs">
-                                 <td className="px-10 py-6 uppercase font-black">Unit {apt.unitNumber}</td>
-                                 <td className="px-10 py-6 text-right text-slate-400">{s.bookings} Reserv.</td>
-                                 <td className="px-10 py-6 text-right text-emerald-600">{s.stayRev.toLocaleString()}</td>
-                                 <td className="px-10 py-6 text-right text-rose-500">-{s.exp.toLocaleString()}</td>
-                                 <td className={`px-10 py-6 text-right font-black ${net >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{net.toLocaleString()} EGP</td>
+                              <tr key={apt.id} className="hover:bg-slate-50 transition-all text-sm">
+                                 <td className="px-12 py-8 uppercase font-black text-slate-950">Unit {apt.unitNumber}</td>
+                                 <td className="px-12 py-8 text-right text-slate-500">{s.nights} System Nights</td>
+                                 <td className="px-12 py-8 text-right text-emerald-600 font-black">{s.stayRev.toLocaleString()}</td>
+                                 <td className="px-12 py-8 text-right text-rose-600 font-black">-{s.exp.toLocaleString()}</td>
+                                 <td className={`px-12 py-8 text-right font-black text-lg ${net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{net.toLocaleString()} EGP</td>
                               </tr>
                            )
                         })}
@@ -194,35 +204,44 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
          )}
 
          {activeTab === 'LEDGER' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden">
-               <div className="p-8 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 no-print">
-                  <h3 className="text-xl font-black uppercase text-slate-950 tracking-tighter">Master Financial Ledger</h3>
+            <div className="bg-white rounded-[4rem] border-4 border-slate-950 shadow-2xl overflow-hidden">
+               <div className="p-10 bg-slate-50 border-b-4 border-slate-950 flex flex-col md:flex-row items-center justify-between gap-8 no-print">
                   <div className="flex items-center gap-4">
-                     <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input placeholder="Search Journal..." className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-200 font-bold text-[10px]" value={search} onChange={e => setSearch(e.target.value)} />
+                     <div className="p-3 bg-slate-950 text-white rounded-2xl"><Layers className="w-6 h-6" /></div>
+                     <h3 className="text-2xl font-black uppercase text-slate-950 tracking-tighter">Master Financial Journal</h3>
+                  </div>
+                  <div className="flex items-center gap-4">
+                     <div className="relative w-full md:w-80">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input placeholder="Search Reference / ID..." className="w-full pl-12 pr-6 py-4 rounded-2xl bg-white border-2 border-slate-100 font-black text-xs outline-none focus:border-slate-950 transition-all" value={search} onChange={e => setSearch(e.target.value)} />
                      </div>
-                     <button onClick={() => exportCSV('master_ledger', ['Date', 'Ref', 'Entity', 'Type', 'Amount'], finance.transactions.map(t => [t.date, t.ref, t.entity, t.type, t.amount]))} className="p-3 bg-slate-950 text-white rounded-xl hover:bg-sky-600 transition-all"><Download className="w-5 h-5"/></button>
+                     <button onClick={() => exportCSV('master_ledger', ['Date', 'Ref', 'Entity', 'Type', 'Amount', 'Currency'], finance.transactions.map(t => [t.date, t.ref, t.entity, t.type, t.amount, t.currency]))} className="p-4 bg-slate-950 text-white rounded-2xl hover:bg-sky-600 transition-all shadow-xl"><FileSpreadsheet className="w-6 h-6"/></button>
                   </div>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left font-bold">
                      <thead>
-                        <tr className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b">
-                           <th className="px-10 py-6">Date</th>
-                           <th className="px-10 py-6">Reference</th>
-                           <th className="px-10 py-6">Entity</th>
-                           <th className="px-10 py-6 text-right">Cash Movement</th>
+                        <tr className="bg-slate-950 text-white text-[10px] font-black uppercase tracking-widest">
+                           <th className="px-12 py-8">Tx Date</th>
+                           <th className="px-12 py-8">Ledger Reference</th>
+                           <th className="px-12 py-8">Counterparty Entity</th>
+                           <th className="px-12 py-8 text-right">Cash Movement</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-slate-50">
-                        {finance.transactions.filter(t => t.ref.toLowerCase().includes(search.toLowerCase())).map((t, idx) => (
-                           <tr key={idx} className="hover:bg-slate-50 transition-all text-xs">
-                              <td className="px-10 py-6 text-slate-400">{t.date}</td>
-                              <td className="px-10 py-6 uppercase font-black text-slate-950">{t.ref}</td>
-                              <td className="px-10 py-6 uppercase font-bold text-slate-400">{t.entity}</td>
-                              <td className={`px-10 py-6 text-right font-black ${t.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                 {t.type === 'OUT' ? '-' : '+'}{t.amount.toLocaleString()} <span className="text-[9px] opacity-40">{t.currency}</span>
+                     <tbody className="divide-y divide-slate-100">
+                        {finance.transactions.filter(t => t.ref.toLowerCase().includes(search.toLowerCase()) || t.entity.toLowerCase().includes(search.toLowerCase())).map((t, idx) => (
+                           <tr key={idx} className="hover:bg-slate-50 transition-all text-sm">
+                              <td className="px-12 py-6 text-slate-500 font-black">{t.date}</td>
+                              <td className="px-12 py-6 uppercase font-black text-slate-950 text-base">{t.ref}</td>
+                              <td className="px-12 py-6 uppercase font-bold text-slate-400">
+                                 <div className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-slate-200"></span>
+                                    {t.entity}
+                                    <span className="text-[10px] opacity-40 ml-2">Unit {t.unit}</span>
+                                 </div>
+                              </td>
+                              <td className={`px-12 py-6 text-right font-black text-lg ${t.type === 'IN' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                 {t.type === 'OUT' ? '−' : '+'}{t.amount.toLocaleString()} <span className="text-[10px] opacity-40">{t.currency}</span>
                               </td>
                            </tr>
                         ))}
