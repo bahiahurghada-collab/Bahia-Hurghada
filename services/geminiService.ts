@@ -2,27 +2,16 @@
 import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
-// دالة مساعدة للحصول على المفتاح بأمان دون كسر التطبيق
-const getApiKey = () => {
-  try {
-    // نتحقق من وجود process أولاً
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      return process.env.API_KEY;
-    }
-  } catch (e) {
-    console.warn("Environment variables not accessible");
-  }
-  return null;
-};
-
 export const getSmartSummary = async (state: AppState) => {
-  const apiKey = getApiKey();
+  // Use environment variable directly as per guidelines
+  const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
     return "AI insights are currently unavailable because the API key is not configured in the environment.";
   }
 
   try {
+    // Initializing with named parameter as per guidelines
     const ai = new GoogleGenAI({ apiKey });
     const prompt = `
       Analyze the following PMS data for Bahia Hurghada and provide a professional business summary.
@@ -48,6 +37,7 @@ export const getSmartSummary = async (state: AppState) => {
         thinkingConfig: { thinkingBudget: 0 }
       }
     });
+    // Use .text property directly
     return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);
