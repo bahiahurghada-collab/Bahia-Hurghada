@@ -22,6 +22,9 @@ export interface UserPermissions {
   canManageStaff: boolean;
   canViewLogs: boolean;
   canManageCommissions: boolean;
+  canViewMaintenance: boolean;
+  canManageMaintenance: boolean;
+  canExportData: boolean;
 }
 
 export interface User {
@@ -132,5 +135,5 @@ export interface AppState {
   notifications: AppNotification[];
   users: User[];
   currentUser: User | null;
-  lastUpdated?: string; // توقيت آخر تحديث للسيرفر
+  lastUpdated?: string;
 }

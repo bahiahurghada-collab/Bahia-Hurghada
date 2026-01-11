@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserPlus, ShoppingCart, UserCheck, ArrowRight, ClipboardPlus, Calendar, ArrowDownRight, MoveRight, History, Percent, LayoutGrid, Globe, Smartphone, MessageCircle
+  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserPlus, ShoppingCart, UserCheck, ArrowRight, ClipboardPlus, Calendar, ArrowDownRight, MoveRight, History, Percent, LayoutGrid, Globe, Smartphone, MessageCircle, Activity
 } from 'lucide-react';
 import { AppState, Booking, BookingStatus, ExtraService } from '../types';
 import { getSmartSummary } from '../services/geminiService';
@@ -70,8 +70,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
-              <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.3em]">Bahia Hurghada Management System v10.0</p>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-2">
+                Bahia Hurghada Management System v11.0 
+                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Auto-Status Engine Active</span>
+              </p>
            </div>
            <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Operations <span className="text-sky-600">Overview</span></h2>
         </div>

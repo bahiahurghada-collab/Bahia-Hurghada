@@ -16,7 +16,7 @@ import SystemLogs from './components/SystemLogs';
 import { databaseService } from './services/databaseService';
 import { storageService } from './services/storageService';
 import { isSupabaseConfigured } from './services/supabaseClient';
-import { Loader2, CloudOff, AlertCircle, Settings, Database, Link, Key, Copy, Check } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const INITIAL_SERVICES: ExtraService[] = [
   { id: 's1', name: 'Standard Cleaning', price: 200, isFree: false },
@@ -30,6 +30,7 @@ const ADMIN_PERMISSIONS: UserPermissions = {
   canViewBookings: true, canManageBookings: true, canDeleteBookings: true, canViewCustomers: true,
   canManageCustomers: true, canDeleteCustomers: true, canViewServices: true, canManageServices: true,
   canViewReports: true, canViewStaff: true, canManageStaff: true, canViewLogs: true, canManageCommissions: true,
+  canViewMaintenance: true, canManageMaintenance: true, canExportData: true
 };
 
 const DEFAULT_ADMIN: User = {
@@ -59,89 +60,13 @@ const App: React.FC = () => {
   const [editBookingId, setEditBookingId] = useState<string | null>(null);
 
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoStatusTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
 
   const handleLogout = useCallback(() => {
     setUser(null);
     localStorage.removeItem(SESSION_STORAGE_KEY);
   }, []);
-
-  const performSync = useCallback(async (forceUpdate: boolean = false) => {
-    if (isSyncing || !isSupabaseConfigured()) return;
-    setIsSyncing(true);
-    setSyncError(null);
-    
-    try {
-      if (forceUpdate) {
-        const success = await databaseService.saveState(state);
-        if (success) {
-          setLastSyncTime(new Date());
-          setSyncError(null);
-        }
-      } else {
-        const result = await databaseService.fetchState(state.lastUpdated);
-        if (result && result.hasUpdates) {
-          setState(result.state);
-          setLastSyncTime(new Date());
-        } else if (!result && !state.lastUpdated) {
-          await databaseService.saveState(INITIAL_STATE);
-        }
-      }
-    } catch (error: any) {
-      setSyncError(error.message || "Connection Error");
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [state, isSyncing]);
-
-  useEffect(() => {
-    const init = async () => {
-      if (!isSupabaseConfigured()) {
-        setIsInitialLoading(false);
-        return;
-      }
-      try {
-        const result = await databaseService.fetchState();
-        let currentState = INITIAL_STATE;
-        if (result) {
-          currentState = result.state;
-          setState(currentState);
-          setLastSyncTime(new Date());
-        } else {
-          const success = await databaseService.saveState(INITIAL_STATE);
-          if (success) {
-             setState(INITIAL_STATE);
-             setLastSyncTime(new Date());
-          }
-        }
-
-        const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (savedUserId) {
-          const foundUser = currentState.users.find(u => u.id === savedUserId);
-          if (foundUser && foundUser.isActive) {
-            setUser(foundUser);
-          }
-        }
-      } catch (e: any) {
-        setSyncError(e.message || "Failed to initialize");
-      } finally {
-        setIsInitialLoading(false);
-      }
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    if (isInitialLoading || !user || !isSupabaseConfigured()) return;
-    
-    syncTimerRef.current = setInterval(() => {
-      performSync(false);
-    }, 30000);
-
-    return () => {
-      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
-    };
-  }, [isInitialLoading, user, performSync]);
 
   const addLog = useCallback((action: string, details: string) => {
     const newLog: AuditLog = {
@@ -170,11 +95,95 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleUpdateBooking = (id: string, updates: Partial<Booking>) => {
-    const newState = {
-      ...state,
-      bookings: state.bookings.map(b => b.id === id ? { ...b, ...updates } : b)
+  const runAutoStatusEngine = useCallback(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const currentTimeStr = now.toTimeString().slice(0, 5);
+
+    let hasChanges = false;
+    const updatedBookings = state.bookings.map(b => {
+      if (b.status === 'confirmed' || b.status === 'pending') {
+        const checkInTime = b.checkInTime || '14:00';
+        if (b.startDate < todayStr || (b.startDate === todayStr && currentTimeStr >= checkInTime)) {
+          hasChanges = true;
+          return { ...b, status: 'stay' as const };
+        }
+      }
+      if (b.status === 'stay') {
+        const checkOutTime = b.checkOutTime || '12:00';
+        if (b.endDate < todayStr || (b.endDate === todayStr && currentTimeStr >= checkOutTime)) {
+          hasChanges = true;
+          return { ...b, status: 'checked_out' as const };
+        }
+      }
+      return b;
+    });
+
+    if (hasChanges) {
+      handleStateUpdate({ ...state, bookings: updatedBookings });
+      addLog('System Auto-Status', 'Multiple folios updated based on timeline');
+    }
+  }, [state, handleStateUpdate, addLog]);
+
+  const performSync = useCallback(async (forceUpdate: boolean = false) => {
+    if (isSyncing || !isSupabaseConfigured()) return;
+    setIsSyncing(true);
+    setSyncError(null);
+    try {
+      if (forceUpdate) {
+        await databaseService.saveState(state);
+        setLastSyncTime(new Date());
+      } else {
+        const result = await databaseService.fetchState(state.lastUpdated);
+        if (result && result.hasUpdates) {
+          setState(result.state);
+          setLastSyncTime(new Date());
+        }
+      }
+    } catch (error: any) {
+      setSyncError(error.message || "Connection Error");
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [state, isSyncing]);
+
+  useEffect(() => {
+    const init = async () => {
+      if (!isSupabaseConfigured()) { setIsInitialLoading(false); return; }
+      try {
+        const result = await databaseService.fetchState();
+        let currentState = INITIAL_STATE;
+        if (result) {
+          currentState = result.state;
+          setState(currentState);
+          setLastSyncTime(new Date());
+        }
+        const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (savedUserId) {
+          const foundUser = currentState.users.find(u => u.id === savedUserId);
+          if (foundUser && foundUser.isActive) setUser(foundUser);
+        }
+      } catch (e: any) {
+        setSyncError(e.message || "Failed to initialize");
+      } finally {
+        setIsInitialLoading(false);
+      }
     };
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (isInitialLoading || !user || !isSupabaseConfigured()) return;
+    syncTimerRef.current = setInterval(() => { performSync(false); }, 30000);
+    autoStatusTimerRef.current = setInterval(() => { runAutoStatusEngine(); }, 60000);
+    return () => {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+      if (autoStatusTimerRef.current) clearInterval(autoStatusTimerRef.current);
+    };
+  }, [isInitialLoading, user, performSync, runAutoStatusEngine]);
+
+  const handleUpdateBooking = (id: string, updates: Partial<Booking>) => {
+    const newState = { ...state, bookings: state.bookings.map(b => b.id === id ? { ...b, ...updates } : b) };
     handleStateUpdate(newState);
     addLog('Update Booking', `ID: ${id}`);
   };
@@ -182,37 +191,37 @@ const App: React.FC = () => {
   const handleAddStayService = (bookingId: string, serviceId: string, paymentMethod: string, isPaid: boolean) => {
     const serviceTemplate = state.services.find(s => s.id === serviceId);
     if (!serviceTemplate) return;
-
     const newStayService: StayService = {
       id: Math.random().toString(36).substr(2, 9),
-      serviceId,
-      name: serviceTemplate.name,
-      price: serviceTemplate.price,
-      date: new Date().toISOString().split('T')[0],
-      paymentMethod,
-      isPaid
+      serviceId, name: serviceTemplate.name, price: serviceTemplate.price,
+      date: new Date().toISOString().split('T')[0], paymentMethod, isPaid
     };
-
     const newState = {
       ...state,
       bookings: state.bookings.map(b => {
         if (b.id === bookingId) {
           const currentExtra = b.extraServices || [];
-          return {
-            ...b,
-            extraServices: [...currentExtra, newStayService],
-            // Update paid amount only if service is paid now
-            paidAmount: isPaid ? b.paidAmount + serviceTemplate.price : b.paidAmount,
-            totalAmount: b.totalAmount + serviceTemplate.price
-          };
+          return { ...b, extraServices: [...currentExtra, newStayService], paidAmount: isPaid ? b.paidAmount + serviceTemplate.price : b.paidAmount, totalAmount: b.totalAmount + serviceTemplate.price };
         }
         return b;
       })
     };
-    
     handleStateUpdate(newState);
-    const aptNum = state.apartments.find(a => a.id === state.bookings.find(b => b.id === bookingId)?.apartmentId)?.unitNumber;
-    addLog('Add Service', `Room ${aptNum}: ${serviceTemplate.name}`);
+    addLog('Add Service', `Room Service Added`);
+  };
+
+  const handleUpdateCustomer = (id: string, updates: Partial<Customer>) => {
+    const newState = { ...state, customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c) };
+    handleStateUpdate(newState);
+    addLog('Update Customer', `Customer ${updates.name || id} modified`);
+  };
+
+  const handleDeleteCustomer = (id: string) => {
+    const hasBookings = state.bookings.some(b => b.customerId === id);
+    if (hasBookings) { alert("Cannot delete customer with existing bookings."); return; }
+    const newState = { ...state, customers: state.customers.filter(c => c.id !== id) };
+    handleStateUpdate(newState);
+    addLog('Delete Customer', `ID: ${id}`);
   };
 
   const handleAddBooking = (b: Omit<Booking, 'id'>, nc?: Omit<Customer, 'id'>) => {
@@ -283,7 +292,7 @@ const App: React.FC = () => {
       {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} />}
       {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => handleStateUpdate({...state, apartments: [...state.apartments, {...a, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, apartments: state.apartments.map(a => a.id === id ? {...a, ...u} : a)})} onDelete={(id) => handleStateUpdate({...state, apartments: state.apartments.filter(a => a.id !== id)})} />}
       {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})} />}
-      {activeTab === 'customers' && <Customers state={state} />}
+      {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={handleUpdateCustomer} onDeleteCustomer={handleDeleteCustomer} permissions={user.permissions} />}
       {activeTab === 'maintenance' && <MaintenanceManagement expenses={state.expenses} apartments={state.apartments} onAddExpense={(exp) => handleStateUpdate({...state, expenses: [...state.expenses, {...exp, id: Math.random().toString(36).substr(2, 9)} ]})} onDeleteExpense={(id) => handleStateUpdate({...state, expenses: state.expenses.filter(e => e.id !== id)})} />}
       {activeTab === 'commissions' && <CommissionManagement state={state} onUpdateBooking={handleUpdateBooking} />}
       {activeTab === 'reports' && <Reports state={state} />}
