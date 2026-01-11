@@ -14,9 +14,10 @@ interface DashboardProps {
   onOpenDetails: (id: string) => void;
   onTabChange?: (tab: string) => void;
   onQuickSettle?: (id: string) => void;
+  onFulfillService?: (bookingId: string, serviceId: string, isExtra: boolean) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBooking, onOpenDetails, onTabChange, onQuickSettle }) => {
+const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBooking, onOpenDetails, onTabChange, onQuickSettle, onFulfillService }) => {
   const [smartSummary, setSmartSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [serviceModal, setServiceModal] = useState<{ open: boolean, bookingId: string }>({ open: false, bookingId: '' });
@@ -46,10 +47,14 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   }, [state.bookings]);
 
   const serviceAlerts = useMemo(() => {
-    return state.bookings.filter(b => 
-      (b.status === 'stay' || b.status === 'confirmed') && 
-      ((b.services && b.services.length > 0) || (b.extraServices && b.extraServices.length > 0))
-    );
+    return state.bookings.filter(b => {
+      if (b.status !== 'stay' && b.status !== 'confirmed') return false;
+      
+      const hasUnfulfilledInitial = b.services.some(sid => !(b.fulfilledServices || []).includes(sid));
+      const hasUnfulfilledExtra = (b.extraServices || []).some(es => !es.isFulfilled);
+      
+      return hasUnfulfilledInitial || hasUnfulfilledExtra;
+    });
   }, [state.bookings]);
 
   const stats = [
@@ -61,6 +66,27 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
 
   const currentStayBookings = state.bookings.filter(b => b.status === 'stay');
 
+  const handleMarkAllFulfilled = () => {
+    if (!detailModal.booking || !onFulfillService) return;
+    const b = detailModal.booking;
+    
+    // Fulfill all initial
+    b.services.forEach(sid => {
+      if (!(b.fulfilledServices || []).includes(sid)) {
+        onFulfillService(b.id, sid, false);
+      }
+    });
+    
+    // Fulfill all extra
+    (b.extraServices || []).forEach(es => {
+      if (!es.isFulfilled) {
+        onFulfillService(b.id, es.id, true);
+      }
+    });
+    
+    setDetailModal({ open: false, booking: null });
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       {/* Header */}
@@ -69,8 +95,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
            <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-2">
-                Bahia Intelligence Terminal v14.0 
-                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Operations Focused</span>
+                Bahia Intelligence Terminal v14.1 
+                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Operations & Fulfillment Focused</span>
               </p>
            </div>
            <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Command <span className="text-sky-600">Center</span></h2>
@@ -102,11 +128,13 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Service Alerts - NEW FAST MODAL TRIGGER */}
+          {/* Service Alerts */}
           <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2.5rem] shadow-sm">
-             <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-amber-500 text-white rounded-lg shadow-sm"><BellRing className="w-4 h-4" /></div>
-                <h3 className="text-xs font-black uppercase tracking-tighter text-amber-900">Amenity Fulfillment Queue</h3>
+             <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                   <div className="p-2 bg-amber-500 text-white rounded-lg shadow-sm"><BellRing className="w-4 h-4" /></div>
+                   <h3 className="text-xs font-black uppercase tracking-tighter text-amber-900">Amenity Fulfillment Queue</h3>
+                </div>
              </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {serviceAlerts.length > 0 ? serviceAlerts.slice(0, 4).map(b => (
@@ -115,7 +143,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-black text-[10px] border border-amber-100">U-{state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}</div>
                          <div className="min-w-0">
                             <p className="text-[11px] font-black text-slate-900 truncate uppercase">{state.customers.find(c => c.id === b.customerId)?.name}</p>
-                            <p className="text-[8px] font-bold text-amber-600 uppercase">Click for Service Details</p>
+                            <p className="text-[8px] font-bold text-amber-600 uppercase">Manage Service Delivery</p>
                          </div>
                       </div>
                       <ArrowRight className="w-4 h-4 text-amber-300 group-hover:text-amber-500" />
@@ -208,14 +236,14 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         </div>
       </div>
 
-      {/* Amenity Detail Modal - FAST VIEW ONLY */}
+      {/* Amenity Detail Modal - FAST VIEW & ACTION */}
       {detailModal.open && detailModal.booking && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[2000] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95 border-2 border-slate-950">
              <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3 text-amber-600">
                    <BellRing className="w-8 h-8" />
-                   <h3 className="text-2xl font-black tracking-tighter uppercase">Amenity Order</h3>
+                   <h3 className="text-2xl font-black tracking-tighter uppercase">Amenity Delivery</h3>
                 </div>
                 <button onClick={() => setDetailModal({ open: false, booking: null })} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-900"><X className="w-8 h-8" /></button>
              </div>
@@ -233,33 +261,36 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                 </div>
 
                 <div className="space-y-3">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Requested Service Package</p>
-                   <div className="bg-sky-50 p-6 rounded-2xl border border-sky-100 space-y-4">
-                      {detailModal.booking.services.map(sid => {
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Pending Fulfillment</p>
+                   <div className="bg-white p-2 rounded-2xl border border-slate-100 space-y-2">
+                      {detailModal.booking.services.filter(sid => !(detailModal.booking!.fulfilledServices || []).includes(sid)).map(sid => {
                          const s = state.services.find(x => x.id === sid);
                          return s ? (
-                            <div key={s.id} className="flex items-center justify-between border-b border-sky-200/50 pb-3 last:border-0 last:pb-0">
-                               <span className="font-black text-sky-900 uppercase text-xs">{s.name}</span>
-                               <span className="font-black text-sky-600 text-[10px]">{s.price} EGP</span>
+                            <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl hover:bg-emerald-50 transition-all group">
+                               <span className="font-black text-slate-900 uppercase text-xs">{s.name}</span>
+                               <button onClick={() => onFulfillService?.(detailModal.booking!.id, s.id, false)} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 hover:border-emerald-200 transition-all">
+                                  <CheckCircle2 className="w-4 h-4" />
+                               </button>
                             </div>
                          ) : null;
                       })}
-                      {detailModal.booking.extraServices?.map(s => (
-                         <div key={s.id} className="flex items-center justify-between border-b border-sky-200/50 pb-3 last:border-0 last:pb-0">
-                            <span className="font-black text-sky-900 uppercase text-xs">{s.name}</span>
-                            <span className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[7px] font-black uppercase">{s.isPaid ? 'PAID' : 'DUE'}</span>
+                      {(detailModal.booking.extraServices || []).filter(es => !es.isFulfilled).map(es => (
+                         <div key={es.id} className="flex items-center justify-between p-3 bg-sky-50 rounded-xl hover:bg-emerald-50 transition-all group">
+                            <span className="font-black text-sky-950 uppercase text-xs">{es.name}</span>
+                            <button onClick={() => onFulfillService?.(detailModal.booking!.id, es.id, true)} className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-emerald-600 hover:border-emerald-200 transition-all">
+                               <CheckCircle2 className="w-4 h-4" />
+                            </button>
                          </div>
                       ))}
+                      {detailModal.booking.services.every(sid => (detailModal.booking!.fulfilledServices || []).includes(sid)) && 
+                       (detailModal.booking.extraServices || []).every(es => es.isFulfilled) && (
+                         <div className="py-8 text-center opacity-30 font-black text-[10px] uppercase">All services fulfilled</div>
+                       )}
                    </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                   <Clock className="w-4 h-4 text-sky-500" />
-                   <span className="text-[10px] font-black uppercase">Fulfillment Window: {detailModal.booking.startDate} (Expected ASAP)</span>
-                </div>
-
-                <button onClick={() => setDetailModal({ open: false, booking: null })} className="w-full py-5 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl flex items-center justify-center gap-3">
-                   <CheckCircle2 className="w-5 h-5" /> Mark as Fulfilled
+                <button onClick={handleMarkAllFulfilled} className="w-full py-5 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl flex items-center justify-center gap-3">
+                   <CheckCircle2 className="w-5 h-5" /> Mark All as Completed
                 </button>
              </div>
           </div>

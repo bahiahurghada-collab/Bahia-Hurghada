@@ -111,6 +111,28 @@ const App: React.FC = () => {
     addLog('Quick Settlement', `Folio for ${state.customers.find(c => c.id === booking.customerId)?.name} fully paid.`);
   };
 
+  const handleFulfillService = (bookingId: string, serviceId: string, isExtra: boolean = false) => {
+    const newState = {
+      ...state,
+      bookings: state.bookings.map(b => {
+        if (b.id !== bookingId) return b;
+        if (isExtra) {
+          return {
+            ...b,
+            extraServices: b.extraServices.map(es => es.id === serviceId ? { ...es, isFulfilled: true } : es)
+          };
+        } else {
+          return {
+            ...b,
+            fulfilledServices: [...(b.fulfilledServices || []), serviceId]
+          };
+        }
+      })
+    };
+    handleStateUpdate(newState);
+    addLog('Service Fulfillment', `Service ${serviceId} marked as completed for booking ${bookingId}`);
+  };
+
   const runAutoStatusEngine = useCallback(() => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -210,7 +232,8 @@ const App: React.FC = () => {
     const newStayService: StayService = {
       id: Math.random().toString(36).substr(2, 9),
       serviceId, name: serviceTemplate.name, price: serviceTemplate.price,
-      date: new Date().toISOString().split('T')[0], paymentMethod, isPaid
+      date: new Date().toISOString().split('T')[0], paymentMethod, isPaid,
+      isFulfilled: false
     };
     const newState = {
       ...state,
@@ -248,7 +271,13 @@ const App: React.FC = () => {
       finalCustomerId = newCustomerRecord.id;
       customers.push(newCustomerRecord);
     }
-    const newBooking: Booking = { ...b as Booking, id: Math.random().toString(36).substr(2, 9), customerId: finalCustomerId, extraServices: [] };
+    const newBooking: Booking = { 
+      ...b as Booking, 
+      id: Math.random().toString(36).substr(2, 9), 
+      customerId: finalCustomerId, 
+      extraServices: [],
+      fulfilledServices: [] 
+    };
     const newState = { ...state, customers, bookings: [...state.bookings, newBooking] };
     handleStateUpdate(newState);
     addLog('New Booking Saved', `Unit ${state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}`);
@@ -304,7 +333,7 @@ const App: React.FC = () => {
         onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})}
         onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})}
       />
-      {activeTab === 'dashboard' && <Dashboard state={state} onAddService={handleAddStayService} onUpdateBooking={handleUpdateBooking} onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} onTabChange={setActiveTab} onQuickSettle={handleQuickSettle} />}
+      {activeTab === 'dashboard' && <Dashboard state={state} onAddService={handleAddStayService} onUpdateBooking={handleUpdateBooking} onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} onTabChange={setActiveTab} onQuickSettle={handleQuickSettle} onFulfillService={handleFulfillService} />}
       {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} />}
       {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => handleStateUpdate({...state, apartments: [...state.apartments, {...a, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, apartments: state.apartments.map(a => a.id === id ? {...a, ...u} : a)})} onDelete={(id) => handleStateUpdate({...state, apartments: state.apartments.filter(a => a.id !== id)})} />}
       {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})} />}
@@ -312,7 +341,7 @@ const App: React.FC = () => {
       {activeTab === 'maintenance' && <MaintenanceManagement expenses={state.expenses} apartments={state.apartments} onAddExpense={(exp) => handleStateUpdate({...state, expenses: [...state.expenses, {...exp, id: Math.random().toString(36).substr(2, 9)} ]})} onDeleteExpense={(id) => handleStateUpdate({...state, expenses: state.expenses.filter(e => e.id !== id)})} />}
       {activeTab === 'commissions' && <CommissionManagement state={state} onUpdateBooking={handleUpdateBooking} />}
       {activeTab === 'reports' && <Reports state={state} />}
-      {activeTab === 'services' && <ServicesManagement state={state} onAdd={s => handleStateUpdate({...state, services: [...state.services, {...s, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, services: state.services.map(s => s.id === id ? {...s, ...u} : s)})} onDelete={id => handleStateUpdate({...state, services: state.services.filter(s => s.id !== id)})} />}
+      {activeTab === 'services' && <ServicesManagement state={state} onAdd={s => handleStateUpdate({...state, services: [...state.services, {...s, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, services: state.services.map(s => s.id === id ? {...s, ...u} : s)})} onDelete={id => handleStateUpdate({...state, services: state.services.filter(s => s.id !== id)})} onFulfillService={handleFulfillService} />}
       {activeTab === 'team' && <UserManagement users={state.users} onAddUser={(u) => handleStateUpdate({...state, users: [...state.users, {...u, id: Math.random().toString(36).substr(2, 9)} as any ]})} onUpdateUser={(id, u) => handleStateUpdate({...state, users: state.users.map(us => us.id === id ? {...us, ...u} : us)})} onDeleteUser={id => handleStateUpdate({...state, users: state.users.filter(u => u.id !== id)})} />}
       {activeTab === 'logs' && <SystemLogs state={state} onImport={async (file) => handleStateUpdate(await storageService.importData(file))} onClearLogs={() => handleStateUpdate({...state, logs: []})} />}
     </Layout>

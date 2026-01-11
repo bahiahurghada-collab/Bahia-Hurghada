@@ -1,4 +1,5 @@
 
+
 export type UserRole = 'admin' | 'reception';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Unpaid';
 export type BookingStatus = 'confirmed' | 'pending' | 'cancelled' | 'maintenance' | 'stay' | 'checked_out';
@@ -72,6 +73,7 @@ export interface StayService {
   date: string;
   paymentMethod: string;
   isPaid: boolean;
+  isFulfilled: boolean;
 }
 
 export interface Expense {
@@ -101,6 +103,7 @@ export interface Booking {
   currency: Currency;
   status: BookingStatus;
   services: string[];
+  fulfilledServices: string[]; // تتبع الخدمات الأساسية التي تم تنفيذها
   extraServices: StayService[];
   totalAmount: number;
   discount: number;

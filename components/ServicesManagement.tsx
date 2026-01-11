@@ -8,9 +8,10 @@ interface ServicesManagementProps {
   onAdd: (service: Omit<ExtraService, 'id'>) => void;
   onUpdate: (id: string, updates: Partial<ExtraService>) => void;
   onDelete: (id: string) => void;
+  onFulfillService?: (bookingId: string, serviceId: string, isExtra: boolean) => void;
 }
 
-const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, onUpdate, onDelete }) => {
+const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, onUpdate, onDelete, onFulfillService }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', price: 0, isFree: false });
@@ -33,22 +34,45 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
 
   // الخدمات المطلوبة في الحجوزات (الطلبات المعلقة للتجهيز)
   const pendingOrders = useMemo(() => {
-    const orders: Array<{id: string, name: string, apt: string, guest: string, date: string, status: string}> = [];
+    const orders: Array<{id: string, bookingId: string, serviceId: string, name: string, apt: string, guest: string, date: string, status: string, isExtra: boolean}> = [];
     state.bookings.forEach(b => {
       if (b.status === 'confirmed' || b.status === 'stay' || b.status === 'pending') {
         const apt = state.apartments.find(a => a.id === b.apartmentId)?.unitNumber || '?';
         const guest = state.customers.find(c => c.id === b.customerId)?.name || 'Guest';
         
+        // Initial services fulfillment tracking
         b.services.forEach(sid => {
-          const sTemplate = state.services.find(s => s.id === sid);
-          if (sTemplate) {
+          if (!(b.fulfilledServices || []).includes(sid)) {
+            const sTemplate = state.services.find(s => s.id === sid);
+            if (sTemplate) {
+              orders.push({
+                id: `p-${b.id}-${sid}`,
+                bookingId: b.id,
+                serviceId: sid,
+                name: sTemplate.name,
+                apt,
+                guest,
+                date: b.startDate,
+                status: b.status,
+                isExtra: false
+              });
+            }
+          }
+        });
+
+        // Extra stay services fulfillment tracking
+        (b.extraServices || []).forEach(es => {
+          if (!es.isFulfilled) {
             orders.push({
-              id: `p-${b.id}-${sid}`,
-              name: sTemplate.name,
+              id: `e-${b.id}-${es.id}`,
+              bookingId: b.id,
+              serviceId: es.id,
+              name: es.name,
               apt,
               guest,
-              date: b.startDate,
-              status: b.status
+              date: es.date,
+              status: b.status,
+              isExtra: true
             });
           }
         });
@@ -106,7 +130,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pendingOrders.map(o => (
-               <div key={o.id} className="bg-white p-5 rounded-3xl border border-amber-100 flex items-center justify-between group shadow-sm">
+               <div key={o.id} className="bg-white p-5 rounded-3xl border border-amber-100 flex items-center justify-between group shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/10">
                   <div className="flex items-center gap-4">
                      <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 font-black text-xs border border-amber-200">U-{o.apt}</div>
                      <div>
@@ -114,9 +138,11 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
                         <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Guest: {o.guest}</p>
                      </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                     <span className="text-[7px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-lg uppercase">{o.status}</span>
-                     <p className="text-[8px] font-bold text-amber-600 mt-1 uppercase tracking-tighter">Stay Start: {o.date}</p>
+                  <div className="flex flex-col items-end gap-2">
+                     <button onClick={() => onFulfillService?.(o.bookingId, o.serviceId, o.isExtra)} className="p-2 bg-white border border-amber-200 text-amber-600 rounded-lg hover:bg-emerald-600 hover:text-white hover:border-emerald-700 transition-all shadow-sm" title="Complete Delivery">
+                        <CheckCircle2 className="w-4 h-4" />
+                     </button>
+                     <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">Due: {o.date}</p>
                   </div>
                </div>
             ))}
@@ -185,6 +211,35 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
             </table>
          </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[1000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full shadow-2xl animate-in zoom-in-95 border-2 border-slate-950">
+             <div className="flex justify-between items-center mb-8">
+                <h3 className="text-2xl font-black text-slate-950 tracking-tighter uppercase">{editingId ? 'Modify Service' : 'Create New Asset'}</h3>
+                <button onClick={closeModal} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-8 h-8" /></button>
+             </div>
+             
+             <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Service Name</label>
+                   <input required className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-slate-900 outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Price (EGP)</label>
+                   <input required type="number" className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-slate-900 outline-none" value={formData.price || ''} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                   <input type="checkbox" id="isFree" checked={formData.isFree} onChange={e => setFormData({...formData, isFree: e.target.checked})} className="w-5 h-5 accent-emerald-600" />
+                   <label htmlFor="isFree" className="text-xs font-black text-emerald-800 uppercase cursor-pointer">Promotional: Mark as Free Service</label>
+                </div>
+                <button type="submit" className="w-full py-6 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-sky-600 transition-all shadow-xl mt-4 flex items-center justify-center gap-3">
+                   <Save className="w-5 h-5" /> {editingId ? 'Save Changes' : 'Publish Asset'}
+                </button>
+             </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

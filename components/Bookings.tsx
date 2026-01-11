@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, Building, Trash2, Edit2, Search, X, Wallet, 
@@ -34,6 +35,7 @@ const Bookings: React.FC<BookingsProps> = ({
 
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // Fix: Added fulfilledServices to initial form data state to satisfy Omit<Booking, 'id'> requirements
   const [formData, setFormData] = useState({
     apartmentId: '', customerId: 'new',
     newCustomer: { name: '', phone: '', email: '', nationality: 'Egyptian' },
@@ -41,7 +43,8 @@ const Bookings: React.FC<BookingsProps> = ({
     platform: 'Direct', paymentMethod: 'Cash', currency: 'EGP' as Currency,
     paidAmount: 0, discount: 0, commissionAmount: 0, commissionPaid: false, status: 'confirmed' as BookingStatus,
     notes: '', receptionistName: userName, selectedServiceIds: [] as string[],
-    extraServices: [] as StayService[]
+    extraServices: [] as StayService[],
+    fulfilledServices: [] as string[]
   });
 
   useEffect(() => {
@@ -110,6 +113,7 @@ const Bookings: React.FC<BookingsProps> = ({
     e.preventDefault();
     const { customerId, newCustomer, selectedServiceIds, ...rest } = formData;
     
+    // Fix: fulfilledServices is now correctly included in 'rest' since it was added to formData
     const bookingPayload: Omit<Booking, 'id'> = {
       ...rest,
       services: selectedServiceIds,
@@ -134,7 +138,8 @@ const Bookings: React.FC<BookingsProps> = ({
       startDate: todayStr, endDate: '', checkInTime: '14:00', checkOutTime: '12:00',
       platform: 'Direct', paymentMethod: 'Cash', currency: 'EGP',
       paidAmount: 0, discount: 0, commissionAmount: 0, commissionPaid: false, status: 'confirmed', notes: '', receptionistName: userName, selectedServiceIds: [],
-      extraServices: []
+      extraServices: [],
+      fulfilledServices: []
     });
   };
 
@@ -149,7 +154,8 @@ const Bookings: React.FC<BookingsProps> = ({
       checkInTime: b.checkInTime || '14:00',
       checkOutTime: b.checkOutTime || '12:00',
       notes: b.notes || '',
-      extraServices: b.extraServices || []
+      extraServices: b.extraServices || [],
+      fulfilledServices: b.fulfilledServices || []
     });
     setIsModalOpen(true);
   };
