@@ -3,19 +3,20 @@ import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
 export const getSmartSummary = async (state: AppState) => {
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
+  // Use process.env.API_KEY directly as per guidelines.
+  if (!process.env.API_KEY) {
     return "AI insights are currently unavailable because the API key is not configured in the environment.";
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    // Correct initialization: use a named parameter `apiKey`.
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const financialStats = {
-      totalRevenue: state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.paidAmount * 50 : b.paidAmount), 0),
-      totalExpenses: state.expenses.reduce((acc, e) => acc + (e.currency === 'USD' ? e.amount * 50 : e.amount), 0),
-      totalCommissions: state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.commissionAmount * 50 : b.commissionAmount), 0),
+      // Use state's live exchange rate instead of a fixed placeholder value.
+      totalRevenue: state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.paidAmount * state.currentExchangeRate : b.paidAmount), 0),
+      totalExpenses: state.expenses.reduce((acc, e) => acc + (e.currency === 'USD' ? e.amount * state.currentExchangeRate : e.amount), 0),
+      totalCommissions: state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.commissionAmount * state.currentExchangeRate : b.commissionAmount), 0),
       units: state.apartments.length,
       activeStays: state.bookings.filter(b => b.status === 'stay').length
     };
@@ -36,14 +37,17 @@ export const getSmartSummary = async (state: AppState) => {
       Keep the tone professional, direct, and elite. English response.
     `;
 
-    // Upgraded to 'gemini-3-pro-preview' for complex financial reasoning
+    // Complex reasoning tasks use 'gemini-3-pro-preview'.
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
+        // Disable thinking for faster financial pulse check.
         thinkingConfig: { thinkingBudget: 0 }
       }
     });
+    
+    // Access response.text property (not a method).
     return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);

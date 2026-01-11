@@ -21,7 +21,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
   const [convertAmount, setConvertAmount] = useState<number>(0);
   const [convertDir, setConvertDir] = useState<'USD2EGP' | 'EGP2USD'>('USD2EGP');
 
-  // 1. Fixed Accounting Engine
   const finance = useMemo(() => {
     const data = {
       transactions: [] as any[],
@@ -48,16 +47,13 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       const isUSD = b.currency === 'USD';
       const rate = b.exchangeRateAtBooking || state.currentExchangeRate;
       
-      // Fix: Services are always entered in EGP in the system templates
       const baseServicesValEGP = b.services.reduce((acc, sid) => acc + (state.services.find(s => s.id === sid)?.price || 0), 0);
       const extraServicesValEGP = (b.extraServices || []).reduce((acc, es) => acc + es.price, 0);
       const totalServicesEGP = baseServicesValEGP + extraServicesValEGP;
 
-      // FIX: Calculate Stay Revenue in EGP correctly by converting total first if needed
       const totalAmountEGP = isUSD ? b.totalAmount * rate : b.totalAmount;
-      const stayOnlyRevenueEGP = totalAmountEGP - totalServicesEGP;
+      const stayOnlyRevenueEGP = Math.max(0, totalAmountEGP - totalServicesEGP);
 
-      // Global Stats
       if (isUSD) {
         data.totalGrossUSD += b.totalAmount;
         data.totalReceivablesUSD += (b.totalAmount - b.paidAmount);
@@ -68,7 +64,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         if (data.byPaymentMethod[b.paymentMethod]) data.byPaymentMethod[b.paymentMethod].collectedEGP += b.paidAmount;
       }
 
-      // Unit Stats (Stay Revenue Only - Verified Positive)
       if (data.unitPerformance[b.apartmentId]) {
         const up = data.unitPerformance[b.apartmentId];
         const nights = Math.max(1, Math.ceil((new Date(b.endDate).getTime() - new Date(b.startDate).getTime()) / (1000 * 60 * 60 * 24)));
@@ -77,7 +72,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         up.bookings += 1;
       }
 
-      // Services Stats (Always normalized to EGP for the chart)
       data.serviceRevenue.total += totalServicesEGP;
       if (totalServicesEGP > 0) {
         data.serviceRevenue.items.push({
@@ -89,7 +83,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         });
       }
 
-      // Commissions
       const commEGP = isUSD ? b.commissionAmount * rate : b.commissionAmount;
       data.commissionStats.total += commEGP;
       if (b.commissionPaid) data.commissionStats.paid += commEGP;
@@ -286,164 +279,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                      </div>
                   )
                })}
-            </div>
-         )}
-         {/* ... Other tabs follow the same structure from previous versions ... */}
-         {activeTab === 'SERVICES' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-               <div className="p-8 bg-slate-950 text-white flex justify-between items-center">
-                  <h3 className="text-2xl font-black uppercase tracking-tighter">Amenity Income Ledger</h3>
-                  <div className="text-right">
-                     <p className="text-[9px] font-black uppercase opacity-40">Total Revenue</p>
-                     <p className="text-3xl font-black text-emerald-400">{finance.serviceRevenue.total.toLocaleString()} EGP</p>
-                  </div>
-               </div>
-               <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                     <thead>
-                        <tr className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b">
-                           <th className="px-8 py-5">Date</th>
-                           <th className="px-8 py-5">Guest Profile</th>
-                           <th className="px-8 py-5">Origin Unit</th>
-                           <th className="px-8 py-5 text-right">Service Value (EGP)</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-50">
-                        {finance.serviceRevenue.items.map((item, idx) => (
-                           <tr key={idx} className="hover:bg-slate-50 transition-all text-[11px]">
-                              <td className="px-8 py-5 text-slate-400">{item.date}</td>
-                              <td className="px-8 py-5 font-black uppercase text-slate-900">{item.guest}</td>
-                              <td className="px-8 py-5 font-black text-sky-600 uppercase">U-{item.unit}</td>
-                              <td className="px-8 py-5 text-right font-black text-emerald-600">
-                                 {item.amount.toLocaleString()} <span className="text-[9px] opacity-40">{item.currency}</span>
-                              </td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
-               </div>
-            </div>
-         )}
-
-         {activeTab === 'EXPENSES' && (
-            <div className="space-y-6">
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {Object.entries(finance.expensesStats.categories).map(([cat, val]) => (
-                     <div key={cat} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm text-center">
-                        <p className="text-[10px] font-black uppercase text-slate-400 mb-2">{cat}</p>
-                        <p className="text-3xl font-black text-rose-600">{val.toLocaleString()} <span className="text-xs">EGP</span></p>
-                     </div>
-                  ))}
-               </div>
-               <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="p-8 border-b border-slate-100 flex justify-between items-center">
-                     <h3 className="text-xl font-black uppercase text-slate-950 tracking-tighter">Purchases & Outflows Journal</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                     <table className="w-full text-left">
-                        <thead>
-                           <tr className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b">
-                              <th className="px-8 py-5">Date</th>
-                              <th className="px-8 py-5">Description / Source</th>
-                              <th className="px-8 py-5">Target Unit</th>
-                              <th className="px-8 py-5 text-right">Outflow Amount</th>
-                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                           {finance.transactions.filter(t => t.type === 'OUTFLOW').map((t, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50 transition-all text-[11px]">
-                                 <td className="px-8 py-5 text-slate-400">{t.date}</td>
-                                 <td className="px-8 py-5 font-black text-slate-900 uppercase">{t.ref}</td>
-                                 <td className="px-8 py-5 font-black text-slate-400">U-{t.unit}</td>
-                                 <td className="px-8 py-5 text-right font-black text-rose-600">
-                                    -{t.amount.toLocaleString()} <span className="text-[9px] opacity-40">{t.currency}</span>
-                                 </td>
-                              </tr>
-                           ))}
-                        </tbody>
-                     </table>
-                  </div>
-               </div>
-            </div>
-         )}
-
-         {activeTab === 'LEDGER' && (
-            <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden">
-               <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between no-print">
-                  <h3 className="text-xl font-black uppercase text-slate-950 tracking-tighter">Master Financial Journal</h3>
-                  <div className="relative w-64">
-                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                     <input placeholder="Search records..." className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-200 font-bold text-[10px]" value={ledgerSearch} onChange={e => setLedgerSearch(e.target.value)} />
-                  </div>
-               </div>
-               <div className="overflow-x-auto">
-                  <table className="w-full text-left font-bold border-collapse min-w-[1000px]">
-                     <thead>
-                        <tr className="bg-slate-50 text-[9px] font-black uppercase text-slate-400 border-b">
-                           <th className="px-8 py-5">Date</th>
-                           <th className="px-8 py-5">Source / Ref</th>
-                           <th className="px-8 py-5">Entity</th>
-                           <th className="px-8 py-5">Unit</th>
-                           <th className="px-8 py-5 text-right">Flow Value</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-50">
-                        {finance.transactions.filter(t => t.ref.toLowerCase().includes(ledgerSearch.toLowerCase())).map((t, idx) => (
-                           <tr key={idx} className="hover:bg-slate-50 transition-all text-[11px]">
-                              <td className="px-8 py-5 text-slate-400">{t.date}</td>
-                              <td className="px-8 py-5 font-black text-slate-900 uppercase">{t.ref}</td>
-                              <td className="px-8 py-5 font-black text-slate-500 uppercase">{t.entity}</td>
-                              <td className="px-8 py-5 font-black text-sky-600">U-{t.unit}</td>
-                              <td className={`px-8 py-5 text-right font-black ${t.type === 'INFLOW' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                 {t.type === 'OUTFLOW' ? '-' : '+'}{t.amount.toLocaleString()} <span className="text-[9px] opacity-40">{t.currency}</span>
-                              </td>
-                           </tr>
-                        ))}
-                     </tbody>
-                  </table>
-               </div>
-            </div>
-         )}
-
-         {activeTab === 'TREASURY' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-               <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm space-y-8">
-                  <div className="flex items-center gap-4">
-                     <div className="p-3 bg-sky-50 text-sky-600 rounded-2xl"><Landmark className="w-6 h-6" /></div>
-                     <h3 className="text-2xl font-black uppercase text-slate-950 tracking-tighter">Net Liquidity (Paid)</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     {PAYMENT_METHODS.map(method => {
-                        const s = finance.byPaymentMethod[method];
-                        if (!s || (s.collectedEGP === 0 && s.collectedUSD === 0)) return null;
-                        return (
-                           <div key={method} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                              <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 block">{method}</span>
-                              <div className="space-y-2">
-                                 <p className="text-xl font-black text-sky-600">{s.collectedUSD.toLocaleString()} <span className="text-[9px]">USD</span></p>
-                                 <p className="text-xl font-black text-emerald-600">{s.collectedEGP.toLocaleString()} <span className="text-[9px]">EGP</span></p>
-                              </div>
-                           </div>
-                        )
-                     })}
-                  </div>
-               </div>
-               <div className="bg-rose-50 rounded-[3rem] border-2 border-rose-100 p-10 shadow-sm space-y-8">
-                  <div className="flex items-center gap-4">
-                     <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-lg"><AlertCircle className="w-6 h-6" /></div>
-                     <h3 className="text-xl font-black uppercase text-rose-950 tracking-tighter">Outstanding Balance (Receivables)</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="p-6 bg-white rounded-3xl border border-rose-100">
-                        <p className="text-[9px] font-black uppercase text-rose-400 mb-1">Due USD</p>
-                        <h4 className="text-2xl font-black text-rose-700 tracking-tighter">{finance.totalReceivablesUSD.toLocaleString()}</h4>
-                     </div>
-                     <div className="p-6 bg-white rounded-3xl border border-rose-100">
-                        <p className="text-[9px] font-black uppercase text-rose-400 mb-1">Due EGP</p>
-                        <h4 className="text-2xl font-black text-rose-700 tracking-tighter">{finance.totalReceivablesEGP.toLocaleString()}</h4>
-                     </div>
-                  </div>
-               </div>
             </div>
          )}
       </div>
