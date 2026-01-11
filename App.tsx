@@ -40,7 +40,8 @@ const DEFAULT_ADMIN: User = {
 
 const INITIAL_STATE: AppState = {
   apartments: [], customers: [], bookings: [], services: INITIAL_SERVICES,
-  expenses: [], logs: [], notifications: [], users: [DEFAULT_ADMIN], currentUser: null
+  expenses: [], logs: [], notifications: [], users: [DEFAULT_ADMIN], currentUser: null,
+  currentExchangeRate: 50.0 // Default fallback
 };
 
 const SESSION_STORAGE_KEY = 'bahia_active_user_id';
@@ -70,6 +71,20 @@ const App: React.FC = () => {
 
   const generateDisplayId = () => `BH-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
+  const fetchLiveExchangeRate = useCallback(async () => {
+    try {
+      const response = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data = await response.json();
+      if (data && data.rates && data.rates.EGP) {
+        const newRate = parseFloat(data.rates.EGP.toFixed(2));
+        setState(prev => ({ ...prev, currentExchangeRate: newRate }));
+        addLog('Currency Update', `Exchange rate updated to ${newRate} EGP/USD`);
+      }
+    } catch (error) {
+      console.error("Failed to fetch rate:", error);
+    }
+  }, []);
+
   const handleLogout = useCallback(() => {
     setUser(null);
     localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -86,7 +101,6 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, logs: [newLog, ...prev.logs].slice(0, 100) }));
   }, [user]);
 
-  // دالة المزامنة مفصولة تماماً عن تحديث الواجهة لمنع الـ Lag
   const triggerSync = useCallback(async (newState: AppState) => {
     if (!isSupabaseConfigured() || isSyncing) return;
     setIsSyncing(true);
@@ -167,6 +181,9 @@ const App: React.FC = () => {
           setState(result.state);
           stateRef.current = result.state;
           setLastSyncTime(new Date());
+        } else {
+          // If fresh start, try fetching initial rate
+          fetchLiveExchangeRate();
         }
         const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
         if (savedUserId) {
@@ -194,7 +211,6 @@ const App: React.FC = () => {
     setState(prev => {
       const updated = prev.bookings.map(b => b.id === id ? { ...b, ...updates } : b);
       const newState = { ...prev, bookings: updated };
-      // نؤجل المزامنة للتقليل من الـ Lag
       setTimeout(() => triggerSync(newState), 0);
       return newState;
     });
@@ -207,7 +223,6 @@ const App: React.FC = () => {
     handleUpdateBooking(bookingId, { paidAmount: booking.totalAmount, paymentStatus: 'Paid' });
   };
 
-  // تم إصلاح الخطأ الـ Syntax هنا
   const handleFulfillService = useCallback((bookingId: string, serviceId: string, isExtra: boolean = false) => {
     setState(prev => {
       const updatedBookings = prev.bookings.map(b => {
@@ -225,7 +240,6 @@ const App: React.FC = () => {
     addLog('Service Delivered', `Fulfillment for ${bookingId}`);
   }, [triggerSync, addLog]);
 
-  // حذف سجل خدمة من الأرشيف
   const handleDeleteServiceRecord = useCallback((bookingId: string, recordId: string, isExtra: boolean) => {
     setState(prev => {
       const updatedBookings = prev.bookings.map(b => {
@@ -265,7 +279,8 @@ const App: React.FC = () => {
       displayId: generateDisplayId(),
       customerId: finalCustomerId, 
       extraServices: [],
-      fulfilledServices: [] 
+      fulfilledServices: [],
+      exchangeRateAtBooking: state.currentExchangeRate
     };
     const newState = { ...state, customers, bookings: [...state.bookings, newBooking] };
     handleStateUpdate(newState);
@@ -342,8 +357,20 @@ const App: React.FC = () => {
         onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})}
         onDeleteBooking={(id) => setState(prev => ({...prev, bookings: prev.bookings.filter(b => b.id !== id)}))}
       />
-      {activeTab === 'dashboard' && <Dashboard state={state} onAddService={handleAddStayService} onUpdateBooking={handleUpdateBooking} onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} onTabChange={setActiveTab} onQuickSettle={handleQuickSettle} onFulfillService={handleFulfillService} />}
-      {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} />}
+      {activeTab === 'dashboard' && (
+        <Dashboard 
+          state={state} 
+          onAddService={handleAddStayService} 
+          onUpdateBooking={handleUpdateBooking} 
+          onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} 
+          onTabChange={setActiveTab} 
+          onQuickSettle={handleQuickSettle} 
+          onFulfillService={handleFulfillService}
+          onUpdateRate={(newRate) => setState(prev => ({ ...prev, currentExchangeRate: newRate }))}
+          onRefreshRate={fetchLiveExchangeRate}
+        />
+      )}
+      {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} state={state} />}
       {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => setState(prev => ({...prev, apartments: [...prev.apartments, {...a, id: Math.random().toString(36).substr(2, 9)}]}))} onUpdate={(id, u) => setState(prev => ({...prev, apartments: prev.apartments.map(a => a.id === id ? {...a, ...u} : a)}))} onDelete={(id) => setState(prev => ({...prev, apartments: prev.apartments.filter(a => a.id !== id)}))} />}
       {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => setState(prev => ({...prev, bookings: prev.bookings.filter(b => b.id !== id)}))} />}
       {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={(id, u) => setState(prev => ({...prev, customers: prev.customers.map(c => c.id === id ? {...c, ...u} : c)}))} onDeleteCustomer={id => setState(prev => ({...prev, customers: prev.customers.filter(c => c.id !== id)}))} permissions={user.permissions} />}

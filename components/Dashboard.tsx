@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Building2, ConciergeBell, UserCheck, DoorOpen, Clock, Globe, Plus, Zap, 
-  CheckCircle2, ArrowRight, Activity, LayoutGrid, ArrowUpRight, Wallet, X, LogOut, CalendarClock
+  CheckCircle2, ArrowRight, Activity, LayoutGrid, ArrowUpRight, Wallet, X, LogOut, CalendarClock, RefreshCw, Coins, ArrowLeftRight, Calculator
 } from 'lucide-react';
 import { AppState, Booking, BookingStatus } from '../types';
 
@@ -14,11 +14,17 @@ interface DashboardProps {
   onTabChange?: (tab: string) => void;
   onQuickSettle?: (id: string) => void;
   onFulfillService?: (bookingId: string, serviceId: string, isExtra: boolean) => void;
+  onUpdateRate?: (rate: number) => void;
+  onRefreshRate?: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBooking, onOpenDetails, onTabChange, onQuickSettle, onFulfillService }) => {
+const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBooking, onOpenDetails, onTabChange, onQuickSettle, onFulfillService, onUpdateRate, onRefreshRate }) => {
   const [serviceModal, setServiceModal] = useState<{ open: boolean, bookingId: string }>({ open: false, bookingId: '' });
   const [newService, setNewService] = useState({ serviceId: '', paymentMethod: 'Cash', isPaid: true });
+  
+  // Converter States
+  const [convertAmount, setConvertAmount] = useState<number>(0);
+  const [convertDir, setConvertDir] = useState<'USD2EGP' | 'EGP2USD'>('USD2EGP');
 
   const todayStr = new Date().toISOString().split('T')[0];
   const next48Str = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -33,14 +39,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     return state.bookings.filter(b => b.status === 'stay');
   }, [state.bookings]);
 
-  // Next 48h Arrivals
   const arrivals48h = useMemo(() => {
     return state.bookings
       .filter(b => (b.status === 'confirmed' || b.status === 'pending') && b.startDate >= todayStr && b.startDate <= next48Str)
       .sort((a, b) => a.startDate.localeCompare(b.startDate));
   }, [state.bookings, todayStr, next48Str]);
 
-  // Next 48h Departures (Next Check-outs)
   const departures48h = useMemo(() => {
     return state.bookings
       .filter(b => b.status === 'stay' && b.endDate >= todayStr && b.endDate <= next48Str)
@@ -54,8 +58,82 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     { label: 'Ready Units', value: state.apartments.length - state.bookings.filter(b => b.status === 'stay' || b.status === 'maintenance').length, icon: DoorOpen, color: 'text-amber-600', bg: 'bg-amber-50', tab: 'apartments' },
   ];
 
+  const convertedValue = useMemo(() => {
+    if (convertDir === 'USD2EGP') return (convertAmount * state.currentExchangeRate).toFixed(2);
+    return (convertAmount / state.currentExchangeRate).toFixed(4);
+  }, [convertAmount, convertDir, state.currentExchangeRate]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-bold">
+      
+      {/* 0. Currency & Converter Matrix (New Section) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
+         {/* Live Exchange Rate Display */}
+         <div className="bg-slate-950 p-8 rounded-[3rem] text-white shadow-xl relative overflow-hidden group border-b-8 border-sky-500">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-all"><Coins className="w-32 h-32" /></div>
+            <div className="relative z-10 space-y-4">
+               <div className="flex justify-between items-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-sky-400">Live Market Rate</p>
+                  <button onClick={onRefreshRate} className="p-2 bg-white/10 hover:bg-sky-500 rounded-xl transition-all"><RefreshCw className="w-4 h-4" /></button>
+               </div>
+               <div className="flex items-baseline gap-2">
+                  <h3 className="text-4xl font-black tracking-tighter">1.00 <span className="text-xs opacity-50">USD</span></h3>
+                  <ArrowRight className="w-4 h-4 text-sky-500" />
+                  <div className="flex flex-col">
+                     <input 
+                       type="number" 
+                       value={state.currentExchangeRate} 
+                       onChange={(e) => onUpdateRate?.(parseFloat(e.target.value))}
+                       className="bg-transparent text-4xl font-black tracking-tighter outline-none border-b border-white/20 focus:border-sky-500 w-28"
+                     />
+                     <span className="text-xs opacity-50 uppercase text-right">EGP</span>
+                  </div>
+               </div>
+               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic pt-2">Real-time sync enabled. Manual override allowed.</p>
+            </div>
+         </div>
+
+         {/* Optional Currency Converter Tool */}
+         <div className="lg:col-span-2 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm flex flex-col md:flex-row items-center gap-8">
+            <div className="flex items-center gap-4">
+               <div className="w-14 h-14 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center shadow-inner"><Calculator className="w-7 h-7" /></div>
+               <div className="min-w-[120px]">
+                  <h4 className="text-xl font-black text-slate-950 tracking-tighter uppercase leading-none">Smart Converter</h4>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-2">Internal Treasury Tool</p>
+               </div>
+            </div>
+            
+            <div className="flex-1 flex flex-col md:flex-row items-center gap-4 w-full">
+               <div className="flex-1 w-full space-y-1">
+                  <div className="flex justify-between px-2">
+                     <span className="text-[9px] font-black uppercase text-slate-400">{convertDir === 'USD2EGP' ? 'USD Amount' : 'EGP Amount'}</span>
+                  </div>
+                  <input 
+                    type="number" 
+                    value={convertAmount || ''} 
+                    onChange={(e) => setConvertAmount(parseFloat(e.target.value))}
+                    className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-sky-500"
+                    placeholder="0.00"
+                  />
+               </div>
+               
+               <button onClick={() => setConvertDir(prev => prev === 'USD2EGP' ? 'EGP2USD' : 'USD2EGP')} className="p-4 bg-slate-900 text-white rounded-full hover:bg-sky-500 transition-all shadow-lg active:scale-90">
+                  <ArrowLeftRight className="w-5 h-5" />
+               </button>
+
+               <div className="flex-1 w-full space-y-1">
+                  <div className="flex justify-between px-2">
+                     <span className="text-[9px] font-black uppercase text-slate-400">Equivalent in {convertDir === 'USD2EGP' ? 'EGP' : 'USD'}</span>
+                  </div>
+                  <div className="w-full p-4 bg-emerald-50 border-2 border-emerald-100 rounded-2xl font-black text-xl text-emerald-700 flex justify-between items-center">
+                     <span>{convertedValue}</span>
+                     <span className="text-xs opacity-40">{convertDir === 'USD2EGP' ? 'EGP' : 'USD'}</span>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </div>
+
       {/* 1. Interactive Stats - Quick Navigation */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
@@ -121,7 +199,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
 
       {/* 3. The 48-Hour Radar (Arrivals & Departures) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-         {/* Next 48h Arrivals */}
          <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm space-y-8">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-black uppercase tracking-tighter text-slate-950 flex items-center gap-3">
@@ -149,7 +226,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
             </div>
          </div>
 
-         {/* Next Check-outs (Departures) */}
          <div className="bg-white rounded-[3rem] border border-slate-200 p-10 shadow-sm space-y-8">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-black uppercase tracking-tighter text-slate-950 flex items-center gap-3">
@@ -206,7 +282,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                   </div>
                 </div>
                 <div className="flex gap-2 pt-4 border-t border-slate-200">
-                  {/* Fixed: Line 209: Replaced 'boolean' type name with 'true' value */}
                   <button onClick={() => setServiceModal({ open: true, bookingId: b.id })} className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase text-[8px] tracking-widest hover:bg-slate-950 hover:text-white transition-all flex items-center justify-center gap-2">
                     <Plus className="w-3 h-3" /> Room Service
                   </button>

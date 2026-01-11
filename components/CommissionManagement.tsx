@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { BadgePercent, CheckCircle2, XCircle, TrendingUp, Wallet, ArrowRight, UserCircle } from 'lucide-react';
+import { BadgePercent, CheckCircle2, XCircle, TrendingUp, Wallet, ArrowRight, UserCircle, DollarSign, Coins } from 'lucide-react';
 import { AppState, Booking } from '../types';
 
 interface CommissionManagementProps {
@@ -38,17 +38,25 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ state, onUp
     <div className="space-y-6 animate-in fade-in duration-700 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
         <div>
-          <h2 className="text-2xl font-black text-slate-950 tracking-tighter uppercase leading-none">Sales Commission</h2>
-          <p className="text-slate-400 font-bold mt-2 text-[10px] uppercase tracking-widest">Monitor staff payouts and platform fees</p>
+          <h2 className="text-2xl font-black text-slate-950 tracking-tighter uppercase leading-none">Sales Commission Hub</h2>
+          <p className="text-slate-400 font-bold mt-2 text-[10px] uppercase tracking-widest">Original currency tracking & payout control</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="px-5 py-3 bg-slate-950 text-white rounded-2xl text-center border-b-4 border-sky-500">
-            <p className="text-[8px] font-black uppercase opacity-50 tracking-widest">Total Accumulation</p>
-            <p className="text-lg font-black">{stats.totalEGP.toLocaleString()} <span className="text-[8px]">EGP</span></p>
+        <div className="flex items-center gap-4">
+          <div className="px-6 py-4 bg-slate-950 text-white rounded-3xl text-center border-b-8 border-sky-500 min-w-[140px]">
+            <div className="flex items-center justify-center gap-1 mb-1">
+               <DollarSign className="w-3 h-3 text-sky-400" />
+               <p className="text-[8px] font-black uppercase opacity-50 tracking-widest">Total USD</p>
+            </div>
+            <p className="text-xl font-black text-sky-400">{stats.totalUSD.toLocaleString()} <span className="text-[10px]">USD</span></p>
+            <p className="text-[7px] font-bold opacity-30 mt-1">Due: {(stats.totalUSD - stats.paidUSD).toLocaleString()}</p>
           </div>
-          <div className="px-5 py-3 bg-rose-50 text-rose-600 rounded-2xl text-center border border-rose-100">
-            <p className="text-[8px] font-black uppercase opacity-60 tracking-widest">Pending Payouts</p>
-            <p className="text-lg font-black">{(stats.totalEGP - stats.paidEGP).toLocaleString()} <span className="text-[8px]">EGP</span></p>
+          <div className="px-6 py-4 bg-emerald-50 text-emerald-700 rounded-3xl text-center border-b-8 border-emerald-500 min-w-[140px]">
+            <div className="flex items-center justify-center gap-1 mb-1">
+               <Coins className="w-3 h-3 text-emerald-600" />
+               <p className="text-[8px] font-black uppercase opacity-60 tracking-widest">Total EGP</p>
+            </div>
+            <p className="text-xl font-black">{stats.totalEGP.toLocaleString()} <span className="text-[10px]">EGP</span></p>
+            <p className="text-[7px] font-bold opacity-30 mt-1">Due: {(stats.totalEGP - stats.paidEGP).toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -59,16 +67,19 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ state, onUp
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Staff Member</th>
               <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Reservation</th>
-              <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Channel</th>
-              <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Commission</th>
-              <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-              <th className="px-8 py-5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Flow</th>
+              <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Exchange / Rate</th>
+              <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Commission Value</th>
+              <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Payout Status</th>
+              <th className="px-8 py-5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
             {bookingsWithCommission.map(b => {
               const guest = state.customers.find(c => c.id === b.customerId)?.name || 'Guest';
               const unit = state.apartments.find(a => a.id === b.apartmentId)?.unitNumber || 'N/A';
+              const rateUsed = b.exchangeRateAtBooking || state.currentExchangeRate;
+              const egpEquivalent = b.currency === 'USD' ? (b.commissionAmount * rateUsed).toFixed(2) : (b.commissionAmount / rateUsed).toFixed(2);
+              
               return (
                 <tr key={b.id} className="hover:bg-slate-50 transition-colors group text-xs">
                   <td className="px-8 py-4">
@@ -79,31 +90,36 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ state, onUp
                   </td>
                   <td className="px-8 py-4">
                     <p className="font-black text-slate-900 truncate uppercase">{guest}</p>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">Unit {unit} • {b.startDate}</p>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">Unit {unit} • {b.platform}</p>
                   </td>
                   <td className="px-8 py-4">
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[8px] font-black uppercase tracking-widest">{b.platform}</span>
+                    <div className="flex flex-col">
+                       <span className="text-[9px] font-black text-slate-900 uppercase">Rate: {rateUsed} EGP</span>
+                       <span className="text-[8px] font-bold text-slate-400 uppercase">Converted: {egpEquivalent} {b.currency === 'USD' ? 'EGP' : 'USD'}</span>
+                    </div>
                   </td>
                   <td className="px-8 py-4 text-right">
-                    <p className="font-black text-sm text-rose-600">{b.commissionAmount.toLocaleString()} <span className="text-[8px] opacity-40">{b.currency}</span></p>
+                    <p className={`font-black text-sm ${b.currency === 'USD' ? 'text-sky-600' : 'text-emerald-600'}`}>
+                       {b.commissionAmount.toLocaleString()} <span className="text-[8px] opacity-40">{b.currency}</span>
+                    </p>
                   </td>
                   <td className="px-8 py-4">
                     {b.commissionPaid ? (
-                      <div className="flex items-center gap-1 text-emerald-600 font-black text-[9px] uppercase tracking-widest">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Settled
+                      <div className="flex items-center gap-1 text-emerald-600 font-black text-[9px] uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-lg w-fit">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Paid & Closed
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1 text-rose-500 font-black text-[9px] uppercase tracking-widest">
-                        <XCircle className="w-3.5 h-3.5" /> Due
+                      <div className="flex items-center gap-1 text-rose-500 font-black text-[9px] uppercase tracking-widest bg-rose-50 px-2 py-1 rounded-lg w-fit">
+                        <XCircle className="w-3.5 h-3.5" /> Pending Payout
                       </div>
                     )}
                   </td>
                   <td className="px-8 py-4 text-right">
                     <button 
                       onClick={() => onUpdateBooking(b.id, { commissionPaid: !b.commissionPaid })}
-                      className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${b.commissionPaid ? 'bg-slate-100 text-slate-500' : 'bg-emerald-600 text-white shadow-md hover:bg-emerald-700'}`}
+                      className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${b.commissionPaid ? 'bg-slate-100 text-slate-500' : 'bg-slate-950 text-white shadow-md hover:bg-emerald-600'}`}
                     >
-                      {b.commissionPaid ? 'Reverse' : 'Release Pay'}
+                      {b.commissionPaid ? 'Reverse Payment' : 'Release Funds'}
                     </button>
                   </td>
                 </tr>
@@ -111,7 +127,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ state, onUp
             })}
             {bookingsWithCommission.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-20 text-center font-black text-slate-300 uppercase tracking-[0.2em]">No commission data available for this period</td>
+                <td colSpan={6} className="py-20 text-center font-black text-slate-300 uppercase tracking-[0.2em]">Zero commission records found in the archive</td>
               </tr>
             )}
           </tbody>

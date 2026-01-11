@@ -108,10 +108,11 @@ export interface Booking {
   extraServices: StayService[];
   totalAmount: number;
   discount: number;
-  commissionRate: number; // النسبة المئوية
-  commissionAmount: number; // القيمة المحسوبة
+  commissionRate: number; 
+  commissionAmount: number; 
   commissionPaid: boolean;
   notes?: string;
+  exchangeRateAtBooking?: number;
 }
 
 export interface AuditLog {
@@ -141,4 +142,5 @@ export interface AppState {
   users: User[];
   currentUser: User | null;
   lastUpdated?: string;
+  currentExchangeRate: number;
 }
