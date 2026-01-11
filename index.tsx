@@ -3,11 +3,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 
-console.log("System booting...");
+console.log("Bahia PMS: Starting system...");
 
 const rootElement = document.getElementById('root');
+
 if (!rootElement) {
-  console.error("Fatal: Root element #root not found in HTML.");
+  document.body.innerHTML = '<div style="color: red; padding: 20px; font-family: sans-serif;">Error: Root element not found.</div>';
 } else {
   try {
     const root = createRoot(rootElement);
@@ -16,8 +17,9 @@ if (!rootElement) {
         <App />
       </React.StrictMode>
     );
-    console.log("React application mounted successfully.");
-  } catch (err) {
-    console.error("React mounting failed:", err);
+    console.log("Bahia PMS: Application mounted.");
+  } catch (error: any) {
+    console.error("Mounting Error:", error);
+    rootElement.innerHTML = `<div style="color: red; padding: 20px; font-family: monospace;">Mounting Error: ${error?.message || error}</div>`;
   }
 }

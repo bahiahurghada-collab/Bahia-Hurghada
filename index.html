@@ -5,7 +5,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bahia Hurghada | Premium PMS</title>
- 
+    <!-- تم إبقاء Tailwind للاستخدام السريع، التحذير في الكونسول لا يعطل التطبيق -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
     <style>
       :root {
@@ -14,23 +15,26 @@
       }
       body {
         font-family: 'Inter', 'Cairo', sans-serif;
-        background-color: #f1f5f9;
-        color: #0f172a;
-        -webkit-font-smoothing: antialiased;
+        background-color: #020617; /* خلفية داكنة لتناسب شاشة التحميل */
+        color: #f1f5f9;
         margin: 0;
+        overflow: hidden;
       }
-      /* ستايل لرسالة الخطأ الحرجة */
-      #critical-error {
-        display: none;
+      #root:empty::after {
+        content: "BAHIA SYSTEM LOADING...";
         position: fixed;
         inset: 0;
-        background: #020617;
-        color: white;
-        z-index: 9999;
-        padding: 40px;
-        font-family: monospace;
-        overflow: auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Inter', sans-serif;
+        font-weight: 900;
+        letter-spacing: 0.5em;
+        color: #0ea5e9;
+        font-size: 14px;
+        animation: pulse 1.5s infinite;
       }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
     <script type="importmap">
 {
@@ -38,36 +42,18 @@
     "react": "https://esm.sh/react@19.0.0",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
-    "recharts": "https://esm.sh/recharts@3.6.0",
     "lucide-react": "https://esm.sh/lucide-react@0.462.0",
+    "recharts": "https://esm.sh/recharts@3.6.0",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "@/": "./",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
-    <script>
-      // نظام كشف الأخطاء المبكر
-      window.onerror = function(msg, url, lineNo, columnNo, error) {
-        const errorDiv = document.getElementById('critical-error');
-        if (errorDiv) {
-          errorDiv.style.display = 'block';
-          errorDiv.innerHTML = `
-            <h1 style="color: #ef4444; font-size: 24px;">CRITICAL SYSTEM ERROR</h1>
-            <p style="color: #94a3b8;">The application failed to start. This is usually due to a module loading error.</p>
-            <hr style="border-color: #1e293b; margin: 20px 0;">
-            <pre style="background: #0f172a; padding: 20px; border-radius: 8px; color: #fca5a5;">${msg}\nat ${url}:${lineNo}:${columnNo}</pre>
-            <button onclick="window.location.reload()" style="background: white; color: black; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold;">Retry Loading</button>
-          `;
-        }
-        return false;
-      };
-    </script>
   </head>
   <body>
     <div id="root"></div>
-    <div id="critical-error"></div>
-    <!-- المحرك سيقوم تلقائياً باستيراد index.tsx هنا -->
   </body>
 </html>
