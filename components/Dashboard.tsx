@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, Users as UsersIcon, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserCheck, ArrowRight, History, Percent, LayoutGrid, Activity, Wallet, BellRing, CheckCircle2, MapPin, User
+  TrendingUp, Users as UsersIcon, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserCheck, ArrowRight, History, Percent, LayoutGrid, Activity, Wallet, BellRing, CheckCircle2, MapPin, User, Globe, CalendarRange
 } from 'lucide-react';
 import { AppState, Booking, BookingStatus, ExtraService } from '../types';
 import { getSmartSummary } from '../services/geminiService';
@@ -36,6 +36,24 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     return { egp, usd };
   }, [state.bookings]);
 
+  const platformPerformance = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const stats: Record<string, { past: number, now: number, next: number }> = {};
+    
+    PLATFORMS.forEach(p => stats[p] = { past: 0, now: 0, next: 0 });
+    
+    state.bookings.filter(b => b.status !== 'cancelled' && b.status !== 'maintenance').forEach(b => {
+      const p = b.platform || 'Direct';
+      if (!stats[p]) stats[p] = { past: 0, now: 0, next: 0 };
+      
+      if (b.endDate < today) stats[p].past++;
+      else if (b.startDate <= today && b.endDate >= today) stats[p].now++;
+      else if (b.startDate > today) stats[p].next++;
+    });
+    
+    return stats;
+  }, [state.bookings]);
+
   const nextActions = useMemo(() => {
     const now = new Date();
     const future48h = new Date(now.getTime() + (48 * 60 * 60 * 1000));
@@ -49,10 +67,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   const serviceAlerts = useMemo(() => {
     return state.bookings.filter(b => {
       if (b.status !== 'stay' && b.status !== 'confirmed') return false;
-      
       const hasUnfulfilledInitial = b.services.some(sid => !(b.fulfilledServices || []).includes(sid));
       const hasUnfulfilledExtra = (b.extraServices || []).some(es => !es.isFulfilled);
-      
       return hasUnfulfilledInitial || hasUnfulfilledExtra;
     });
   }, [state.bookings]);
@@ -69,34 +85,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   const handleMarkAllFulfilled = () => {
     if (!detailModal.booking || !onFulfillService) return;
     const b = detailModal.booking;
-    
-    // Fulfill all initial
-    b.services.forEach(sid => {
-      if (!(b.fulfilledServices || []).includes(sid)) {
-        onFulfillService(b.id, sid, false);
-      }
-    });
-    
-    // Fulfill all extra
-    (b.extraServices || []).forEach(es => {
-      if (!es.isFulfilled) {
-        onFulfillService(b.id, es.id, true);
-      }
-    });
-    
+    b.services.forEach(sid => { if (!(b.fulfilledServices || []).includes(sid)) onFulfillService(b.id, sid, false); });
+    (b.extraServices || []).forEach(es => { if (!es.isFulfilled) onFulfillService(b.id, es.id, true); });
     setDetailModal({ open: false, booking: null });
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
            <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-2">
-                Bahia Intelligence Terminal v14.1 
-                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Operations & Fulfillment Focused</span>
+                Bahia Intelligence Terminal v15.4 
+                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Live Financial Matrix</span>
               </p>
            </div>
            <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Command <span className="text-sky-600">Center</span></h2>
@@ -124,6 +127,36 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
             <p className={`text-2xl font-black mt-1 tracking-tighter ${stat.color}`}>{stat.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Platform Matrix Section */}
+      <div className="bg-slate-950 p-8 rounded-[3rem] text-white shadow-xl overflow-hidden relative">
+         <div className="absolute top-0 right-0 p-8 opacity-5"><Globe className="w-32 h-32" /></div>
+         <div className="flex items-center gap-3 mb-8 relative z-10">
+            <CalendarRange className="w-5 h-5 text-sky-400" />
+            <h3 className="text-sm font-black uppercase tracking-widest">Platform Performance Matrix</h3>
+         </div>
+         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 relative z-10">
+            {PLATFORMS.filter(p => p !== 'None').map(p => (
+               <div key={p} className="bg-white/5 border border-white/10 p-5 rounded-3xl backdrop-blur-sm group hover:bg-white/10 transition-all">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-sky-400 mb-4">{p}</p>
+                  <div className="space-y-3">
+                     <div className="flex justify-between items-center">
+                        <span className="text-[8px] font-black uppercase opacity-40">Past</span>
+                        <span className="text-xs font-black text-slate-300">{platformPerformance[p]?.past || 0}</span>
+                     </div>
+                     <div className="flex justify-between items-center">
+                        <span className="text-[8px] font-black uppercase opacity-40">Now</span>
+                        <span className="text-xs font-black text-emerald-400">{platformPerformance[p]?.now || 0}</span>
+                     </div>
+                     <div className="flex justify-between items-center">
+                        <span className="text-[8px] font-black uppercase opacity-40">Next</span>
+                        <span className="text-xs font-black text-sky-400">{platformPerformance[p]?.next || 0}</span>
+                     </div>
+                  </div>
+               </div>
+            ))}
+         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -179,7 +212,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                                </div>
                             </div>
                             {b.totalAmount - b.paidAmount > 0 && (
-                                <button onClick={() => onQuickSettle?.(b.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
+                                <button onClick={() => onQuickSettle?.(b.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm group-hover:bg-emerald-500 group-hover:text-white" title="Quick Settle Balance">
                                     <Wallet className="w-3.5 h-3.5" />
                                 </button>
                             )}
@@ -203,9 +236,16 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                                   <p className={`text-[8px] font-bold uppercase ${b.totalAmount - b.paidAmount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>Bal: {b.totalAmount - b.paidAmount}</p>
                                </div>
                             </div>
-                            <button onClick={() => setServiceModal({ open: true, bookingId: b.id })} className="p-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-all shadow-sm">
-                                <Zap className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex gap-1.5">
+                               {b.totalAmount - b.paidAmount > 0 && (
+                                  <button onClick={() => onQuickSettle?.(b.id)} className="p-2 bg-white text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-600 hover:text-white transition-all">
+                                      <Wallet className="w-3.5 h-3.5" />
+                                  </button>
+                               )}
+                               <button onClick={() => setServiceModal({ open: true, bookingId: b.id })} className="p-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-all shadow-sm">
+                                   <Zap className="w-3.5 h-3.5" />
+                               </button>
+                            </div>
                          </div>
                       ))}
                    </div>
@@ -236,7 +276,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         </div>
       </div>
 
-      {/* Amenity Detail Modal - FAST VIEW & ACTION */}
+      {/* Amenity Detail Modal */}
       {detailModal.open && detailModal.booking && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[2000] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95 border-2 border-slate-950">

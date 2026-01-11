@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, TrendingDown, Scale, Calendar, Printer, Bed, Zap, FileText, Search, CreditCard, DollarSign
+  TrendingUp, TrendingDown, Scale, Calendar, Printer, Bed, Zap, FileText, Search, CreditCard, DollarSign, Globe
 } from 'lucide-react';
 import { AppState } from '../types';
-import { USD_TO_EGP_RATE } from '../constants';
+import { USD_TO_EGP_RATE, PLATFORMS } from '../constants';
 
 const Reports: React.FC<{ state: AppState }> = ({ state }) => {
   const [dateRange, setDateRange] = useState({
@@ -12,12 +12,15 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
     end: new Date().toISOString().split('T')[0]
   });
 
-  const [activeTab, setActiveTab] = useState<'CONSOLIDATED' | 'INCOME' | 'EXPENSE'>('CONSOLIDATED');
+  const [activeTab, setActiveTab] = useState<'CONSOLIDATED' | 'CHANNELS' | 'EXPENSE'>('CONSOLIDATED');
 
   const financialData = useMemo(() => {
     const inflow: any[] = [];
     const outflow: any[] = [];
+    const channelSummary: Record<string, { revenue: number, count: number }> = {};
     
+    PLATFORMS.forEach(p => channelSummary[p] = { revenue: 0, count: 0 });
+
     let totalAccommodationEGP = 0;
     let totalServicesEGP = 0;
 
@@ -25,18 +28,37 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       const apt = state.apartments.find(a => a.id === b.apartmentId);
       const guest = state.customers.find(c => c.id === b.customerId);
 
-      // 1. Accommodation Revenue Calculation
-      const start = new Date(b.startDate);
-      const end = new Date(b.endDate);
-      const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-      const nightlyPrice = (nights >= 30 && apt?.monthlyPrice ? apt.monthlyPrice / 30 : apt?.dailyPrice || 0);
-      const stayPriceEGP = (b.currency === 'USD' ? (nights * nightlyPrice) * USD_TO_EGP_RATE : nights * nightlyPrice);
-      
       const paidEGP = b.paidAmount * (b.currency === 'USD' ? USD_TO_EGP_RATE : 1);
+      const totalEGP = b.totalAmount * (b.currency === 'USD' ? USD_TO_EGP_RATE : 1);
+
+      // Attribution model: proportional split between accommodation and amenities
+      // First calculate services total cost in EGP
+      const baseServicesCostEGP = b.services.reduce((acc, sid) => {
+        const s = state.services.find(x => x.id === sid);
+        return acc + (s ? (b.currency === 'USD' ? s.price * USD_TO_EGP_RATE : s.price) : 0);
+      }, 0);
+
+      const extraServicesCostEGP = (b.extraServices || []).reduce((acc, s) => {
+        return acc + (s.isPaid ? (b.currency === 'USD' ? s.price * USD_TO_EGP_RATE : s.price) : 0);
+      }, 0);
+
+      const totalAmenitiesEGP = baseServicesCostEGP + extraServicesCostEGP;
+      const totalAccommodationPortionEGP = Math.max(0, totalEGP - totalAmenitiesEGP);
+
+      // Ratio of payment to total
+      const paymentRatio = totalEGP > 0 ? paidEGP / totalEGP : 0;
       
-      // We attribute payment to accommodation first, then overflow to services if any (simple model)
-      const accommodationPortion = Math.min(paidEGP, stayPriceEGP);
-      totalAccommodationEGP += accommodationPortion;
+      const accommodationRevenue = totalAccommodationPortionEGP * paymentRatio;
+      const amenityRevenue = totalAmenitiesEGP * paymentRatio;
+
+      totalAccommodationEGP += accommodationRevenue;
+      totalServicesEGP += amenityRevenue;
+
+      const p = b.platform || 'Direct';
+      if (channelSummary[p]) {
+        channelSummary[p].revenue += paidEGP;
+        channelSummary[p].count += 1;
+      }
 
       inflow.push({
         id: `book-${b.id}`,
@@ -47,44 +69,6 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         amount: b.paidAmount,
         currency: b.currency,
         method: b.paymentMethod
-      });
-
-      // 2. Services Revenue Calculation
-      // Primary services selected at booking
-      b.services.forEach(sid => {
-        if ((b.fulfilledServices || []).includes(sid)) {
-          const s = state.services.find(x => x.id === sid);
-          if (s) {
-            totalServicesEGP += (b.currency === 'USD' ? s.price * USD_TO_EGP_RATE : s.price);
-            inflow.push({
-              id: `serv-base-${b.id}-${sid}`,
-              date: b.startDate,
-              category: 'AMENITY',
-              source: guest?.name || 'Guest',
-              ref: `${s.name} [ID: ${b.displayId}]`,
-              amount: s.price,
-              currency: b.currency,
-              method: b.paymentMethod
-            });
-          }
-        }
-      });
-
-      // Extra stay services
-      (b.extraServices || []).forEach(s => {
-        if (s.isPaid && s.isFulfilled) {
-          totalServicesEGP += (b.currency === 'USD' ? s.price * USD_TO_EGP_RATE : s.price);
-          inflow.push({
-            id: `serv-extra-${s.id}`,
-            date: s.date,
-            category: 'AMENITY',
-            source: guest?.name || 'Guest',
-            ref: `${s.name} [ID: ${b.displayId}]`,
-            amount: s.price,
-            currency: b.currency,
-            method: s.paymentMethod
-          });
-        }
       });
     });
 
@@ -104,14 +88,15 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       inflow: inflow.sort((a,b) => b.date.localeCompare(a.date)), 
       outflow: outflow.sort((a,b) => b.date.localeCompare(a.date)),
       totalAccommodationEGP,
-      totalServicesEGP
+      totalServicesEGP,
+      channelSummary
     };
   }, [state, dateRange]);
 
   const stats = useMemo(() => {
-    const sum = (arr: any[]) => arr.reduce((acc, curr) => acc + (curr.currency === 'USD' ? curr.amount * USD_TO_EGP_RATE : curr.amount), 0);
+    const sumOut = (arr: any[]) => arr.reduce((acc, curr) => acc + (curr.currency === 'USD' ? curr.amount * USD_TO_EGP_RATE : curr.amount), 0);
     const income = financialData.totalAccommodationEGP + financialData.totalServicesEGP;
-    const expense = sum(financialData.outflow);
+    const expense = sumOut(financialData.outflow);
     return { income, expense, net: income - expense };
   }, [financialData]);
 
@@ -122,7 +107,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
           <div className="w-14 h-14 bg-slate-950 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl"><Scale className="w-7 h-7" /></div>
           <div>
             <h2 className="text-2xl font-black text-slate-950 tracking-tighter uppercase leading-none">Financial Intelligence</h2>
-            <p className="text-slate-400 font-bold text-[9px] uppercase tracking-[0.3em] mt-2">Revenue Decomposition V15.2</p>
+            <p className="text-slate-400 font-bold text-[9px] uppercase tracking-[0.3em] mt-2">Revenue Decomposition V15.4</p>
           </div>
         </div>
         
@@ -159,39 +144,62 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
          </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
-         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-            <TrendingUp className="w-5 h-5 text-emerald-600" />
-            <h3 className="text-sm font-black uppercase tracking-widest">Revenue Ledger</h3>
-         </div>
-         <table className="w-full text-left">
-            <thead>
-               <tr className="bg-slate-50 text-[8px] font-black uppercase tracking-widest text-slate-400 border-b">
-                  <th className="px-8 py-4">Date</th>
-                  <th className="px-8 py-4">Ref / ID</th>
-                  <th className="px-8 py-4">Category</th>
-                  <th className="px-8 py-4 text-right">Amount</th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-               {financialData.inflow.map(l => (
-                  <tr key={l.id} className="text-[11px] font-bold">
-                     <td className="px-8 py-4 text-slate-400">{l.date}</td>
-                     <td className="px-8 py-4 uppercase">
-                        <p>{l.source}</p>
-                        <p className="text-[9px] text-sky-600 tracking-tight">{l.ref}</p>
-                     </td>
-                     <td className="px-8 py-4">
-                        <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${l.category === 'ACCOMMODATION' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                           {l.category}
-                        </span>
-                     </td>
-                     <td className="px-8 py-4 text-right text-emerald-600 font-black">+{l.amount.toLocaleString()} {l.currency}</td>
-                  </tr>
-               ))}
-            </tbody>
-         </table>
+      <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl w-fit">
+         <button onClick={() => setActiveTab('CONSOLIDATED')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CONSOLIDATED' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Ledger</button>
+         <button onClick={() => setActiveTab('CHANNELS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CHANNELS' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}>Channels</button>
       </div>
+
+      {activeTab === 'CONSOLIDATED' && (
+        <div className="bg-white rounded-[2.5rem] border border-slate-200 overflow-hidden shadow-sm">
+           <div className="p-6 border-b border-slate-100 flex items-center gap-3">
+              <TrendingUp className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-sm font-black uppercase tracking-widest">Revenue Ledger</h3>
+           </div>
+           <table className="w-full text-left">
+              <thead>
+                 <tr className="bg-slate-50 text-[8px] font-black uppercase tracking-widest text-slate-400 border-b">
+                    <th className="px-8 py-4">Date</th>
+                    <th className="px-8 py-4">Ref / ID</th>
+                    <th className="px-8 py-4">Category</th>
+                    <th className="px-8 py-4 text-right">Amount</th>
+                 </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                 {financialData.inflow.map(l => (
+                    <tr key={l.id} className="text-[11px] font-bold">
+                       <td className="px-8 py-4 text-slate-400">{l.date}</td>
+                       <td className="px-8 py-4 uppercase">
+                          <p>{l.source}</p>
+                          <p className="text-[9px] text-sky-600 tracking-tight">{l.ref}</p>
+                       </td>
+                       <td className="px-8 py-4">
+                          <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${l.category === 'ACCOMMODATION' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                             {l.category}
+                          </span>
+                       </td>
+                       <td className="px-8 py-4 text-right text-emerald-600 font-black">+{l.amount.toLocaleString()} {l.currency}</td>
+                    </tr>
+                 ))}
+              </tbody>
+           </table>
+        </div>
+      )}
+
+      {activeTab === 'CHANNELS' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+           {PLATFORMS.filter(p => financialData.channelSummary[p]?.count > 0).map(p => (
+              <div key={p} className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform"><Globe className="w-20 h-20" /></div>
+                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-1">{p}</p>
+                 <h4 className="text-3xl font-black text-slate-900 tracking-tighter">{financialData.channelSummary[p].revenue.toLocaleString()} <span className="text-xs opacity-30">EGP</span></h4>
+                 <div className="mt-6 pt-4 border-t border-slate-50 flex items-center justify-between">
+                    <span className="text-[8px] font-black uppercase text-slate-400">Total Reservations</span>
+                    <span className="text-xs font-black text-slate-900">{financialData.channelSummary[p].count} Records</span>
+                 </div>
+              </div>
+           ))}
+        </div>
+      )}
     </div>
   );
 };

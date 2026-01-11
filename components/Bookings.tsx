@@ -34,13 +34,12 @@ const Bookings: React.FC<BookingsProps> = ({
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Fix: Added fulfilledServices to initial form data state to satisfy Omit<Booking, 'id'> requirements
   const [formData, setFormData] = useState({
     apartmentId: '', customerId: 'new',
     newCustomer: { name: '', phone: '', email: '', nationality: 'Egyptian' },
     startDate: todayStr, endDate: '', checkInTime: '14:00', checkOutTime: '12:00',
     platform: 'Direct', paymentMethod: 'Cash', currency: 'EGP' as Currency,
-    paidAmount: 0, discount: 0, commissionAmount: 0, commissionPaid: false, status: 'confirmed' as BookingStatus,
+    paidAmount: 0, discount: 0, commissionRate: 0, commissionAmount: 0, commissionPaid: false, status: 'confirmed' as BookingStatus,
     notes: '', receptionistName: userName, selectedServiceIds: [] as string[],
     extraServices: [] as StayService[],
     fulfilledServices: [] as string[]
@@ -71,7 +70,7 @@ const Bookings: React.FC<BookingsProps> = ({
   const currentApt = useMemo(() => state.apartments.find(a => a.id === formData.apartmentId), [formData.apartmentId, state.apartments]);
 
   const finance = useMemo(() => {
-    if (!currentApt || !formData.startDate || !formData.endDate) return { total: 0, remaining: 0, nights: 0, servicesCost: 0 };
+    if (!currentApt || !formData.startDate || !formData.endDate) return { total: 0, remaining: 0, nights: 0, servicesCost: 0, commissionCalculated: 0 };
     
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
@@ -91,11 +90,14 @@ const Bookings: React.FC<BookingsProps> = ({
       finalTotal = totalRaw / USD_TO_EGP_RATE;
     }
 
+    const commissionCalculated = Number((finalTotal * (formData.commissionRate / 100)).toFixed(2));
+
     return { 
       total: Number(finalTotal.toFixed(2)), 
       remaining: Number((finalTotal - formData.paidAmount).toFixed(2)), 
       nights,
-      servicesCost
+      servicesCost,
+      commissionCalculated
     };
   }, [formData, currentApt, state.services]);
 
@@ -112,13 +114,13 @@ const Bookings: React.FC<BookingsProps> = ({
     e.preventDefault();
     const { customerId, newCustomer, selectedServiceIds, ...rest } = formData;
     
-    // Fix: displayId is now omitted from bookingPayload as it is generated in the parent component (App.tsx)
     const bookingPayload: Omit<Booking, 'id' | 'displayId'> = {
       ...rest,
       services: selectedServiceIds,
       customerId: customerId === 'new' ? '' : customerId,
       bookingDate: todayStr,
       totalAmount: finance.total,
+      commissionAmount: finance.commissionCalculated,
       paymentStatus: finance.remaining <= 0 ? 'Paid' : (formData.paidAmount > 0 ? 'Partial' : 'Unpaid'),
       receptionistName: rest.receptionistName || userName
     };
@@ -136,7 +138,7 @@ const Bookings: React.FC<BookingsProps> = ({
       apartmentId: '', customerId: 'new', newCustomer: { name: '', phone: '', email: '', nationality: 'Egyptian' },
       startDate: todayStr, endDate: '', checkInTime: '14:00', checkOutTime: '12:00',
       platform: 'Direct', paymentMethod: 'Cash', currency: 'EGP',
-      paidAmount: 0, discount: 0, commissionAmount: 0, commissionPaid: false, status: 'confirmed', notes: '', receptionistName: userName, selectedServiceIds: [],
+      paidAmount: 0, discount: 0, commissionRate: 0, commissionAmount: 0, commissionPaid: false, status: 'confirmed', notes: '', receptionistName: userName, selectedServiceIds: [],
       extraServices: [],
       fulfilledServices: []
     });
@@ -298,7 +300,7 @@ const Bookings: React.FC<BookingsProps> = ({
                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1 col-span-2">
                            <label className="text-[8px] font-black text-slate-500 uppercase ml-1">Unit Assignment</label>
-                           <select required className="w-full p-2.5 rounded-xl border-slate-100 bg-slate-50 font-black text-xs" value={formData.apartmentId} onChange={e => setFormData({ ...formData, apartmentId: e.target.value })}>
+                           <select required className="w-full p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-xs" value={formData.apartmentId} onChange={e => setFormData({ ...formData, apartmentId: e.target.value })}>
                              <option value="">Choose Room...</option>
                              {state.apartments.map(a => <option key={a.id} value={a.id}>U-{a.unitNumber} ({a.view})</option>)}
                            </select>
@@ -364,7 +366,6 @@ const Bookings: React.FC<BookingsProps> = ({
                            {CURRENCIES.map(c => <option key={c} value={c} className="text-slate-900">{c}</option>)}
                          </select>
                          <select className="bg-white/5 border border-white/10 p-2.5 rounded-xl font-black text-[10px] outline-none cursor-pointer" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
-                           {/* Fix: Corrected PAYNING_METHODS typo to PAYMENT_METHODS */}
                            {PAYMENT_METHODS.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
                          </select>
                       </div>
@@ -378,8 +379,11 @@ const Bookings: React.FC<BookingsProps> = ({
                    {/* Commisions & Channel Tracking */}
                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] space-y-4">
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center gap-1"><Percent className="w-3 h-3 text-rose-500" /> Sales Commission</label>
-                        <input type="number" placeholder="Enter amount..." className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-black text-xs text-rose-600" value={formData.commissionAmount || ''} onChange={e => setFormData({...formData, commissionAmount: Number(e.target.value)})} />
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1 flex items-center justify-between"><span className="flex items-center gap-1"><Percent className="w-3 h-3 text-rose-500" /> Sales Commission</span> <span className="text-rose-600 font-black">{finance.commissionCalculated} {formData.currency}</span></label>
+                        <div className="flex gap-2">
+                           <input type="number" placeholder="%" className="w-20 p-2.5 rounded-xl border border-slate-200 bg-white font-black text-xs text-rose-600" value={formData.commissionRate || ''} onChange={e => setFormData({...formData, commissionRate: Number(e.target.value)})} />
+                           <div className="flex-1 p-2.5 rounded-xl border border-slate-100 bg-slate-50 font-black text-xs text-slate-400 flex items-center justify-center">Auto-calculated</div>
+                        </div>
                       </div>
                       
                       <div className="space-y-1">
