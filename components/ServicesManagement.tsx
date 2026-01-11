@@ -32,15 +32,13 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
     setFormData({ name: '', price: 0, isFree: false });
   };
 
-  // الخدمات المطلوبة في الحجوزات (الطلبات المعلقة للتجهيز)
   const pendingOrders = useMemo(() => {
-    const orders: Array<{id: string, bookingId: string, serviceId: string, name: string, apt: string, guest: string, date: string, status: string, isExtra: boolean}> = [];
+    const orders: Array<{id: string, bookingId: string, displayId: string, serviceId: string, name: string, apt: string, guest: string, date: string, status: string, isExtra: boolean}> = [];
     state.bookings.forEach(b => {
       if (b.status === 'confirmed' || b.status === 'stay' || b.status === 'pending') {
         const apt = state.apartments.find(a => a.id === b.apartmentId)?.unitNumber || '?';
         const guest = state.customers.find(c => c.id === b.customerId)?.name || 'Guest';
         
-        // Initial services fulfillment tracking
         b.services.forEach(sid => {
           if (!(b.fulfilledServices || []).includes(sid)) {
             const sTemplate = state.services.find(s => s.id === sid);
@@ -48,6 +46,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
               orders.push({
                 id: `p-${b.id}-${sid}`,
                 bookingId: b.id,
+                displayId: b.displayId,
                 serviceId: sid,
                 name: sTemplate.name,
                 apt,
@@ -60,12 +59,12 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
           }
         });
 
-        // Extra stay services fulfillment tracking
         (b.extraServices || []).forEach(es => {
           if (!es.isFulfilled) {
             orders.push({
               id: `e-${b.id}-${es.id}`,
               bookingId: b.id,
+              displayId: b.displayId,
               serviceId: es.id,
               name: es.name,
               apt,
@@ -82,28 +81,57 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
   }, [state.bookings, state.services, state.apartments, state.customers]);
 
   const serviceHistory = useMemo(() => {
-    const history: Array<StayService & { apartmentNumber: string, guestName: string }> = [];
+    const history: Array<StayService & { apartmentNumber: string, guestName: string, displayId: string }> = [];
     state.bookings.forEach(b => {
       const apt = state.apartments.find(a => a.id === b.apartmentId);
       const guest = state.customers.find(c => c.id === b.customerId);
+      
+      // Basic services that were fulfilled
+      b.services.forEach(sid => {
+        if ((b.fulfilledServices || []).includes(sid)) {
+          const sTemplate = state.services.find(s => s.id === sid);
+          if (sTemplate) {
+            history.push({
+              id: `hist-${b.id}-${sid}`,
+              bookingId: b.id,
+              displayId: b.displayId,
+              serviceId: sid,
+              name: sTemplate.name,
+              price: sTemplate.price,
+              date: b.startDate,
+              isPaid: b.paymentStatus === 'Paid',
+              isFulfilled: true,
+              paymentMethod: b.paymentMethod,
+              apartmentNumber: apt?.unitNumber || '?',
+              guestName: guest?.name || 'Guest'
+            });
+          }
+        }
+      });
+
+      // Extra stay services that were fulfilled
       if (b.extraServices) {
         b.extraServices.forEach(s => {
-          history.push({
-            ...s,
-            apartmentNumber: apt?.unitNumber || '?',
-            guestName: guest?.name || 'Guest'
-          });
+          if (s.isFulfilled) {
+            history.push({
+              ...s,
+              displayId: b.displayId,
+              apartmentNumber: apt?.unitNumber || '?',
+              guestName: guest?.name || 'Guest'
+            });
+          }
         });
       }
     });
     return history.sort((a, b) => b.date.localeCompare(a.date));
-  }, [state.bookings, state.apartments, state.customers]);
+  }, [state.bookings, state.services, state.apartments, state.customers]);
 
   const filteredHistory = useMemo(() => {
     return serviceHistory.filter(h => 
       h.apartmentNumber.includes(historySearch) || 
       h.name.toLowerCase().includes(historySearch.toLowerCase()) ||
-      h.guestName.toLowerCase().includes(historySearch.toLowerCase())
+      h.guestName.toLowerCase().includes(historySearch.toLowerCase()) ||
+      h.displayId.toLowerCase().includes(historySearch.toLowerCase())
     );
   }, [serviceHistory, historySearch]);
 
@@ -114,7 +142,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
           <div className="p-4 bg-slate-950 rounded-2xl text-white shadow-xl"><Zap className="w-7 h-7" /></div>
           <div>
             <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Amenities Catalog</h2>
-            <p className="text-slate-400 font-bold mt-2 text-[10px] uppercase tracking-widest">Asset Management & Service Ops</p>
+            <p className="text-slate-400 font-bold mt-2 text-[10px] uppercase tracking-widest">Bahia Service Operations V15.0</p>
           </div>
         </div>
         <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-3 bg-sky-500 text-white px-8 py-4 rounded-[1.5rem] font-black hover:bg-sky-600 transition-all shadow-lg uppercase text-[12px] tracking-widest">
@@ -122,11 +150,10 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
         </button>
       </div>
 
-      {/* Pending Fulfillment Section */}
       <div className="bg-amber-50 border border-amber-100 rounded-[3rem] p-8 shadow-sm">
          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-amber-500 text-white rounded-lg"><BellRing className="w-5 h-5" /></div>
-            <h3 className="text-xl font-black uppercase text-amber-900 tracking-tighter">Pending Delivery Fulfillment</h3>
+            <div className="p-2 bg-amber-500 text-white rounded-lg shadow-sm"><BellRing className="w-5 h-5" /></div>
+            <h3 className="text-xl font-black uppercase text-amber-900 tracking-tighter">Live Fulfillment Queue (Pending)</h3>
          </div>
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pendingOrders.map(o => (
@@ -135,21 +162,22 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
                      <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 font-black text-xs border border-amber-200">U-{o.apt}</div>
                      <div>
                         <p className="text-[12px] font-black text-slate-950 uppercase tracking-tight leading-none">{o.name}</p>
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Guest: {o.guest}</p>
+                        <p className="text-[8px] font-bold text-sky-600 uppercase tracking-widest mt-1">ID: {o.displayId} • {o.guest}</p>
                      </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                     <button onClick={() => onFulfillService?.(o.bookingId, o.serviceId, o.isExtra)} className="p-2 bg-white border border-amber-200 text-amber-600 rounded-lg hover:bg-emerald-600 hover:text-white hover:border-emerald-700 transition-all shadow-sm" title="Complete Delivery">
+                     <button onClick={() => onFulfillService?.(o.bookingId, o.serviceId, o.isExtra)} className="p-2 bg-white border border-amber-200 text-amber-600 rounded-lg hover:bg-emerald-600 hover:text-white hover:border-emerald-700 transition-all shadow-sm" title="Mark as Delivered">
                         <CheckCircle2 className="w-4 h-4" />
                      </button>
-                     <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">Due: {o.date}</p>
+                     <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest leading-none">Req: {o.date}</p>
                   </div>
                </div>
             ))}
-            {pendingOrders.length === 0 && <div className="col-span-3 py-10 text-center opacity-30 font-black text-[10px] uppercase tracking-widest">All service requests fulfilled</div>}
+            {pendingOrders.length === 0 && <div className="col-span-3 py-10 text-center opacity-30 font-black text-[10px] uppercase tracking-widest">System Clear: All orders delivered</div>}
          </div>
       </div>
 
+      {/* Catalog Grid remain same */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {services.map(s => (
           <div key={s.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:border-sky-500 transition-all group">
@@ -163,7 +191,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
             <h3 className="text-lg font-black text-slate-950 uppercase tracking-tight mb-1">{s.name}</h3>
             <div className="flex items-center justify-between mt-2 pt-4 border-t border-slate-50">
               <p className="text-xl font-black text-slate-900">{s.price.toLocaleString()} <span className="text-[10px] opacity-40 uppercase">EGP</span></p>
-              {s.isFree && <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-lg uppercase">Promo: Free</span>}
+              {s.isFree && <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-lg uppercase">Promo</span>}
             </div>
           </div>
         ))}
@@ -174,13 +202,13 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
             <div className="flex items-center gap-4">
                <div className="w-12 h-12 bg-slate-950 rounded-2xl flex items-center justify-center text-white"><History className="w-6 h-6" /></div>
                <div>
-                 <h3 className="text-xl font-black uppercase text-slate-950 tracking-tighter leading-none">Delivered Service History</h3>
-                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Archived log of all successful deliveries</p>
+                 <h3 className="text-xl font-black uppercase text-slate-950 tracking-tighter leading-none">Delivered Service Archive</h3>
+                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Verified fulfillment log with Booking ID links</p>
                </div>
             </div>
             <div className="relative w-full md:w-64">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-               <input placeholder="Filter Log..." className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:border-sky-500 outline-none font-bold text-[10px] transition-all" value={historySearch} onChange={e => setHistorySearch(e.target.value)} />
+               <input placeholder="Filter by ID, Guest, Room..." className="w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:border-sky-500 outline-none font-bold text-[10px] transition-all" value={historySearch} onChange={e => setHistorySearch(e.target.value)} />
             </div>
          </div>
          <div className="overflow-x-auto">
@@ -188,10 +216,10 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
                <thead>
                   <tr className="bg-slate-50/30 text-slate-400 text-[8px] uppercase tracking-[0.2em] border-b border-slate-100">
                      <th className="px-8 py-5">Date</th>
-                     <th className="px-8 py-5">Service</th>
-                     <th className="px-8 py-5">Location</th>
-                     <th className="px-8 py-5">Guest</th>
-                     <th className="px-8 py-5 text-right">Accounting</th>
+                     <th className="px-8 py-5">Service Asset</th>
+                     <th className="px-8 py-5">Unit / Booking ID</th>
+                     <th className="px-8 py-5">Guest Partner</th>
+                     <th className="px-8 py-5 text-right">Accounting Status</th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-50">
@@ -199,11 +227,14 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
                      <tr key={h.id} className="hover:bg-slate-50/80 transition-all text-[11px]">
                         <td className="px-8 py-5"><span className="text-slate-900 font-black">{h.date}</span></td>
                         <td className="px-8 py-5"><span className="text-slate-950 font-black uppercase">{h.name}</span></td>
-                        <td className="px-8 py-5"><span className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-black text-slate-600 uppercase">Unit {h.apartmentNumber}</span></td>
+                        <td className="px-8 py-5">
+                           <p className="font-black text-slate-600 uppercase">Unit {h.apartmentNumber}</p>
+                           <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-0.5">{h.displayId}</p>
+                        </td>
                         <td className="px-8 py-5"><span className="text-slate-500 uppercase font-bold">{h.guestName}</span></td>
                         <td className="px-8 py-5 text-right">
                            <p className="text-lg font-black tracking-tighter text-slate-950">{h.price.toLocaleString()} EGP</p>
-                           <span className={`text-[8px] font-black uppercase ${h.isPaid ? 'text-emerald-500' : 'text-rose-500'}`}>{h.isPaid ? 'Settled' : 'Unpaid'}</span>
+                           <span className={`text-[8px] font-black uppercase ${h.isPaid ? 'text-emerald-500' : 'text-rose-500'}`}>{h.isPaid ? 'Settled' : 'Unpaid (Due)'}</span>
                         </td>
                      </tr>
                   ))}
@@ -211,7 +242,7 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
             </table>
          </div>
       </div>
-
+      {/* Modal remain same */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[1000] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full shadow-2xl animate-in zoom-in-95 border-2 border-slate-950">
@@ -219,7 +250,6 @@ const ServicesManagement: React.FC<ServicesManagementProps> = ({ state, onAdd, o
                 <h3 className="text-2xl font-black text-slate-950 tracking-tighter uppercase">{editingId ? 'Modify Service' : 'Create New Asset'}</h3>
                 <button onClick={closeModal} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-8 h-8" /></button>
              </div>
-             
              <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-1">
                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Service Name</label>

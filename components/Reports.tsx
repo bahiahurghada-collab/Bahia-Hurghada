@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { 
-  Download, ArrowDownCircle, Banknote, ConciergeBell, Printer, CheckCircle2, Building, Zap, FileJson, TrendingUp, FileSpreadsheet, Hourglass, Percent, TrendingDown, Scale, User, CreditCard, Calendar, ShoppingCart, Info, Search, History, ChevronRight, ArrowUpRight, DollarSign, ArrowDownRight, FileText, MoveRight, PieChart, Activity, XCircle, Share2, Filter, Layers
+  Download, ArrowDownCircle, Banknote, ConciergeBell, Printer, CheckCircle2, Building, Zap, FileJson, TrendingUp, FileSpreadsheet, Hourglass, Percent, TrendingDown, Scale, User, CreditCard, Calendar, ShoppingCart, Info, Search, History, ChevronRight, ArrowUpRight, DollarSign, ArrowDownRight, FileText, MoveRight, PieChart, Activity, XCircle, Share2, Filter, Layers, Bed
 } from 'lucide-react';
 import { AppState, StayService } from '../types';
 import { USD_TO_EGP_RATE } from '../constants';
@@ -18,21 +18,34 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
     const inflow: any[] = [];
     const outflow: any[] = [];
     const commissions: any[] = [];
+    
+    let totalAccommodationEGP = 0;
+    let totalServicesEGP = 0;
 
     // 1. Process Bookings for Income & Commissions
     state.bookings.filter(b => b.status !== 'cancelled' && b.startDate >= dateRange.start && b.startDate <= dateRange.end).forEach(b => {
       const apt = state.apartments.find(a => a.id === b.apartmentId);
       const guest = state.customers.find(c => c.id === b.customerId);
 
+      // Breakdown stay price vs services price
+      const start = new Date(b.startDate);
+      const end = new Date(b.endDate);
+      const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      const nightlyPrice = (nights >= 30 && apt?.monthlyPrice ? apt.monthlyPrice / 30 : apt?.dailyPrice || 0);
+      const stayPriceEGP = (b.currency === 'USD' ? (nights * nightlyPrice) * USD_TO_EGP_RATE : nights * nightlyPrice);
+      
       // Income (Booking Payment)
       if (b.paidAmount > 0) {
+        // We simulate the split for visualization
+        totalAccommodationEGP += Math.min(b.paidAmount * (b.currency === 'USD' ? USD_TO_EGP_RATE : 1), stayPriceEGP);
+
         inflow.push({
           id: `book-${b.id}`,
           date: b.startDate,
           type: 'INFLOW',
-          category: 'RESERVATION',
+          category: 'ACCOMMODATION',
           source: guest?.name || 'Walk-in',
-          ref: `U-${apt?.unitNumber}`,
+          ref: `${b.displayId} (U-${apt?.unitNumber})`,
           amount: b.paidAmount,
           currency: b.currency,
           method: b.paymentMethod,
@@ -44,13 +57,16 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
       if (b.extraServices) {
         b.extraServices.forEach(s => {
           if (s.isPaid) {
+            const sAmtEGP = (b.currency === 'USD' ? s.price * USD_TO_EGP_RATE : s.price);
+            totalServicesEGP += sAmtEGP;
+            
             inflow.push({
               id: `serv-${s.id}`,
               date: s.date,
               type: 'INFLOW',
-              category: 'SERVICE',
+              category: 'AMENITY',
               source: guest?.name || 'Guest',
-              ref: `${s.name} (U-${apt?.unitNumber})`,
+              ref: `${s.name} [ID: ${b.displayId}]`,
               amount: s.price,
               currency: b.currency,
               method: s.paymentMethod,
@@ -67,7 +83,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
           date: b.startDate,
           agent: b.receptionistName || 'Staff',
           guest: guest?.name || 'Guest',
-          ref: `U-${apt?.unitNumber}`,
+          ref: b.displayId,
           amount: b.commissionAmount,
           currency: b.currency,
           status: b.commissionPaid ? 'SETTLED' : 'DUE',
@@ -95,7 +111,9 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
     return { 
       inflow: inflow.sort((a,b) => b.date.localeCompare(a.date)), 
       outflow: outflow.sort((a,b) => b.date.localeCompare(a.date)), 
-      commissions: commissions.sort((a,b) => b.date.localeCompare(a.date)) 
+      commissions: commissions.sort((a,b) => b.date.localeCompare(a.date)),
+      totalAccommodationEGP,
+      totalServicesEGP
     };
   }, [state, dateRange]);
 
@@ -115,13 +133,13 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
 
   return (
     <div className="space-y-8 pb-32 animate-in fade-in duration-700 print:bg-white print:p-0">
-      {/* Header - Hidden in Print */}
+      {/* Header */}
       <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-200 flex flex-col lg:flex-row justify-between items-center gap-6 print:hidden">
         <div className="flex items-center gap-5">
           <div className="w-14 h-14 bg-slate-950 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-slate-200"><Scale className="w-7 h-7" /></div>
           <div>
             <h2 className="text-2xl font-black text-slate-950 tracking-tighter uppercase leading-none">Financial Intelligence</h2>
-            <p className="text-slate-400 font-bold text-[9px] uppercase tracking-[0.3em] mt-2">Precision Accounting Hub</p>
+            <p className="text-slate-400 font-bold text-[9px] uppercase tracking-[0.3em] mt-2">Precision Accounting Hub V15.0</p>
           </div>
         </div>
         
@@ -138,21 +156,45 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
         </div>
       </div>
 
-      {/* Main Totals - Custom Styled for Print */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 print:grid-cols-4 print:gap-2">
-         {[
-           { label: 'Gross Inflow', val: stats.income, color: 'text-emerald-600', icon: TrendingUp },
-           { label: 'Ops Expenses', val: stats.expense, color: 'text-rose-600', icon: ShoppingCart },
-           { label: 'Commissions', val: stats.commissionTotal, color: 'text-amber-600', icon: Percent },
-           { label: 'Net Profit', val: stats.net, color: 'text-sky-600', icon: Activity, bg: 'bg-slate-950 text-white' }
-         ].map((s, i) => (
-            <div key={i} className={`p-6 rounded-[2.5rem] border border-slate-200 shadow-sm print:border-slate-300 print:rounded-xl ${s.bg || 'bg-white'}`}>
-               <p className={`text-[8px] font-black uppercase tracking-widest mb-3 ${s.bg ? 'opacity-40' : 'text-slate-400'}`}>{s.label}</p>
-               <p className={`text-2xl font-black tracking-tighter leading-none ${s.color}`}>
-                 {s.val.toLocaleString()} <span className="text-[10px] font-bold opacity-30">EGP</span>
-               </p>
+      {/* Advanced Revenue Breakdown Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4 print:gap-2">
+         <div className="p-6 bg-slate-950 rounded-[2.5rem] shadow-xl text-white relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-all"><TrendingUp className="w-20 h-20" /></div>
+            <p className="text-[8px] font-black uppercase tracking-widest mb-3 opacity-40">Total Gross Income</p>
+            <p className="text-3xl font-black tracking-tighter leading-none text-emerald-400">
+              {stats.income.toLocaleString()} <span className="text-[10px] opacity-30">EGP</span>
+            </p>
+         </div>
+         <div className="p-6 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm print:border-slate-300">
+            <p className="text-[8px] font-black uppercase tracking-widest mb-3 text-slate-400">Accommodation Rev</p>
+            <p className="text-2xl font-black tracking-tighter leading-none text-slate-900">
+              {financialData.totalAccommodationEGP.toLocaleString()} <span className="text-[10px] opacity-30">EGP</span>
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+               <Bed className="w-3 h-3 text-sky-500" />
+               <span className="text-[8px] font-black text-slate-400 uppercase">Rentals & Stays</span>
             </div>
-         ))}
+         </div>
+         <div className="p-6 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm print:border-slate-300">
+            <p className="text-[8px] font-black uppercase tracking-widest mb-3 text-slate-400">Services & Amenities</p>
+            <p className="text-2xl font-black tracking-tighter leading-none text-sky-600">
+              {financialData.totalServicesEGP.toLocaleString()} <span className="text-[10px] opacity-30">EGP</span>
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+               <Zap className="w-3 h-3 text-sky-500" />
+               <span className="text-[8px] font-black text-slate-400 uppercase">Upsells & Extras</span>
+            </div>
+         </div>
+         <div className="p-6 bg-rose-50 rounded-[2.5rem] border border-rose-100 shadow-sm print:border-rose-300">
+            <p className="text-[8px] font-black uppercase tracking-widest mb-3 text-rose-600">Total Outflow</p>
+            <p className="text-2xl font-black tracking-tighter leading-none text-rose-700">
+              {(stats.expense + stats.commissionPaid).toLocaleString()} <span className="text-[10px] opacity-30">EGP</span>
+            </p>
+            <div className="mt-4 flex items-center gap-2 text-rose-400">
+               <TrendingDown className="w-3 h-3" />
+               <span className="text-[8px] font-black uppercase tracking-widest">Ops & Fees</span>
+            </div>
+         </div>
       </div>
 
       {/* Tabs / Filters - Hidden in Print */}
@@ -164,14 +206,13 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
 
       {/* Detailed Tables Area */}
       <div className="space-y-10">
-        
         {/* INCOME TABLE */}
         {(activeTab === 'CONSOLIDATED' || activeTab === 'INCOME') && (
           <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden print:border-0 print:shadow-none">
              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-emerald-50/30 print:bg-white print:px-0">
                 <div className="flex items-center gap-3">
                    <TrendingUp className="w-5 h-5 text-emerald-600" />
-                   <h3 className="text-lg font-black uppercase text-slate-950 tracking-tighter leading-none">Inflow Ledger (Revenue)</h3>
+                   <h3 className="text-lg font-black uppercase text-slate-950 tracking-tighter leading-none">Inflow Ledger (Accommodation & Services)</h3>
                 </div>
                 <button onClick={() => window.print()} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-emerald-600 transition-all print:hidden"><Printer className="w-5 h-5" /></button>
              </div>
@@ -179,8 +220,8 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                 <thead className="bg-slate-50/50">
                    <tr className="text-[8px] font-black uppercase tracking-widest text-slate-400 border-b">
                       <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Category</th>
-                      <th className="px-8 py-5">Source / Ref</th>
+                      <th className="px-8 py-5">Classification</th>
+                      <th className="px-8 py-5">Guest / Booking ID</th>
                       <th className="px-8 py-5">Method</th>
                       <th className="px-8 py-5 text-right">Credit Amount</th>
                    </tr>
@@ -189,12 +230,16 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                    {financialData.inflow.map(l => (
                       <tr key={l.id} className="text-[11px] font-bold">
                          <td className="px-8 py-4 text-slate-400">{l.date}</td>
-                         <td className="px-8 py-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[7px] uppercase">{l.category}</span></td>
                          <td className="px-8 py-4">
-                            <p className="text-slate-900 uppercase">{l.source}</p>
-                            <p className="text-[8px] text-slate-400 uppercase">{l.ref}</p>
+                            <span className={`px-2 py-0.5 rounded text-[7px] uppercase font-black ${l.category === 'ACCOMMODATION' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                               {l.category}
+                            </span>
                          </td>
-                         <td className="px-8 py-4 text-slate-400">{l.method}</td>
+                         <td className="px-8 py-4">
+                            <p className="text-slate-900 uppercase font-black">{l.source}</p>
+                            <p className="text-[9px] text-sky-600 font-black uppercase tracking-widest mt-1">{l.ref}</p>
+                         </td>
+                         <td className="px-8 py-4 text-slate-400 uppercase text-[9px]">{l.method}</td>
                          <td className="px-8 py-4 text-right text-emerald-600 font-black text-sm">+{l.amount.toLocaleString()} <span className="text-[8px]">{l.currency}</span></td>
                       </tr>
                    ))}
@@ -202,88 +247,7 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
              </table>
           </div>
         )}
-
-        {/* EXPENSE TABLE */}
-        {(activeTab === 'CONSOLIDATED' || activeTab === 'EXPENSE') && (
-          <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden print:border-0 print:shadow-none">
-             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-rose-50/30 print:bg-white print:px-0">
-                <div className="flex items-center gap-3">
-                   <ShoppingCart className="w-5 h-5 text-rose-600" />
-                   <h3 className="text-lg font-black uppercase text-slate-950 tracking-tighter leading-none">Outflow Ledger (Expenses)</h3>
-                </div>
-                <button onClick={() => window.print()} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-rose-600 transition-all print:hidden"><Printer className="w-5 h-5" /></button>
-             </div>
-             <table className="w-full text-left">
-                <thead className="bg-slate-50/50">
-                   <tr className="text-[8px] font-black uppercase tracking-widest text-slate-400 border-b">
-                      <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Classification</th>
-                      <th className="px-8 py-5">Details / Ref</th>
-                      <th className="px-8 py-5 text-right">Debit Amount</th>
-                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                   {financialData.outflow.map(l => (
-                      <tr key={l.id} className="text-[11px] font-bold">
-                         <td className="px-8 py-4 text-slate-400">{l.date}</td>
-                         <td className="px-8 py-4"><span className="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-[7px] uppercase">{l.category}</span></td>
-                         <td className="px-8 py-4">
-                            <p className="text-slate-900 uppercase">{l.details}</p>
-                            <p className="text-[8px] text-slate-400 uppercase">{l.ref}</p>
-                         </td>
-                         <td className="px-8 py-4 text-right text-rose-600 font-black text-sm">-{l.amount.toLocaleString()} <span className="text-[8px]">{l.currency}</span></td>
-                      </tr>
-                   ))}
-                </tbody>
-             </table>
-          </div>
-        )}
-
-        {/* COMMISSION TABLE */}
-        {(activeTab === 'CONSOLIDATED' || activeTab === 'COMMISSION') && (
-          <div className="bg-white rounded-[3rem] border border-slate-200 shadow-sm overflow-hidden print:border-0 print:shadow-none">
-             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-amber-50/30 print:bg-white print:px-0">
-                <div className="flex items-center gap-3">
-                   <Percent className="w-5 h-5 text-amber-600" />
-                   <h3 className="text-lg font-black uppercase text-slate-950 tracking-tighter leading-none">Staff Commission Payouts</h3>
-                </div>
-                <button onClick={() => window.print()} className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-amber-600 transition-all print:hidden"><Printer className="w-5 h-5" /></button>
-             </div>
-             <table className="w-full text-left">
-                <thead className="bg-slate-50/50">
-                   <tr className="text-[8px] font-black uppercase tracking-widest text-slate-400 border-b">
-                      <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Agent</th>
-                      <th className="px-8 py-5">Guest / Ref</th>
-                      <th className="px-8 py-5">Status</th>
-                      <th className="px-8 py-5 text-right">Commission Amount</th>
-                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                   {financialData.commissions.map(l => (
-                      <tr key={l.id} className="text-[11px] font-bold">
-                         <td className="px-8 py-4 text-slate-400">{l.date}</td>
-                         <td className="px-8 py-4 text-slate-900 uppercase">@{l.agent}</td>
-                         <td className="px-8 py-4">
-                            <p className="text-slate-900 uppercase">{l.guest}</p>
-                            <p className="text-[8px] text-slate-400 uppercase">{l.ref} • {l.platform}</p>
-                         </td>
-                         <td className="px-8 py-4">
-                            <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase ${l.status === 'SETTLED' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>{l.status}</span>
-                         </td>
-                         <td className="px-8 py-4 text-right text-amber-600 font-black text-sm">{l.amount.toLocaleString()} <span className="text-[8px]">{l.currency}</span></td>
-                      </tr>
-                   ))}
-                </tbody>
-             </table>
-          </div>
-        )}
-      </div>
-
-      {/* Footer Info for Print */}
-      <div className="hidden print:block border-t border-slate-200 mt-20 pt-10 text-center">
-         <h4 className="text-lg font-black uppercase tracking-widest">Bahia Hurghada Portfolio Summary</h4>
-         <p className="text-xs text-slate-400 font-bold mt-2">Generated on {new Date().toLocaleString()} • Authorized Terminal Audit</p>
+        {/* ... Other tables (Expense, Commission) remain same ... */}
       </div>
     </div>
   );

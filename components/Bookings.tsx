@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, Building, Trash2, Edit2, Search, X, Wallet, 
@@ -12,7 +11,7 @@ import { PLATFORMS, PAYMENT_METHODS, CURRENCIES, NATIONALITIES, USD_TO_EGP_RATE 
 
 interface BookingsProps {
   state: AppState;
-  onAddBooking: (booking: Omit<Booking, 'id'>, newCustomer?: Omit<Customer, 'id'>) => void;
+  onAddBooking: (booking: Omit<Booking, 'id' | 'displayId'>, newCustomer?: Omit<Customer, 'id'>) => void;
   onUpdateBooking: (id: string, updates: Partial<Booking>) => void;
   onCancelBooking: (id: string) => void;
   onDeleteBooking: (id: string) => void;
@@ -113,8 +112,8 @@ const Bookings: React.FC<BookingsProps> = ({
     e.preventDefault();
     const { customerId, newCustomer, selectedServiceIds, ...rest } = formData;
     
-    // Fix: fulfilledServices is now correctly included in 'rest' since it was added to formData
-    const bookingPayload: Omit<Booking, 'id'> = {
+    // Fix: displayId is now omitted from bookingPayload as it is generated in the parent component (App.tsx)
+    const bookingPayload: Omit<Booking, 'id' | 'displayId'> = {
       ...rest,
       services: selectedServiceIds,
       customerId: customerId === 'new' ? '' : customerId,
@@ -365,7 +364,7 @@ const Bookings: React.FC<BookingsProps> = ({
                            {CURRENCIES.map(c => <option key={c} value={c} className="text-slate-900">{c}</option>)}
                          </select>
                          <select className="bg-white/5 border border-white/10 p-2.5 rounded-xl font-black text-[10px] outline-none cursor-pointer" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
-                           {PAYMENT_METHODS.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
+                           {PAYNING_METHODS.map(m => <option key={m} value={m} className="text-slate-900">{m}</option>)}
                          </select>
                       </div>
 

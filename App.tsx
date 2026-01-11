@@ -63,6 +63,8 @@ const App: React.FC = () => {
   const autoStatusTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
 
+  const generateDisplayId = () => `BH-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
   const handleLogout = useCallback(() => {
     setUser(null);
     localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -95,74 +97,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleQuickSettle = (bookingId: string) => {
-    const booking = state.bookings.find(b => b.id === bookingId);
-    if (!booking) return;
-
-    const newState = {
-      ...state,
-      bookings: state.bookings.map(b => 
-        b.id === bookingId 
-          ? { ...b, paidAmount: b.totalAmount, paymentStatus: 'Paid' as const } 
-          : b
-      )
-    };
-    handleStateUpdate(newState);
-    addLog('Quick Settlement', `Folio for ${state.customers.find(c => c.id === booking.customerId)?.name} fully paid.`);
-  };
-
-  const handleFulfillService = (bookingId: string, serviceId: string, isExtra: boolean = false) => {
-    const newState = {
-      ...state,
-      bookings: state.bookings.map(b => {
-        if (b.id !== bookingId) return b;
-        if (isExtra) {
-          return {
-            ...b,
-            extraServices: b.extraServices.map(es => es.id === serviceId ? { ...es, isFulfilled: true } : es)
-          };
-        } else {
-          return {
-            ...b,
-            fulfilledServices: [...(b.fulfilledServices || []), serviceId]
-          };
-        }
-      })
-    };
-    handleStateUpdate(newState);
-    addLog('Service Fulfillment', `Service ${serviceId} marked as completed for booking ${bookingId}`);
-  };
-
-  const runAutoStatusEngine = useCallback(() => {
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const currentTimeStr = now.toTimeString().slice(0, 5);
-
-    let hasChanges = false;
-    const updatedBookings = state.bookings.map(b => {
-      if (b.status === 'confirmed' || b.status === 'pending') {
-        const checkInTime = b.checkInTime || '14:00';
-        if (b.startDate < todayStr || (b.startDate === todayStr && currentTimeStr >= checkInTime)) {
-          hasChanges = true;
-          return { ...b, status: 'stay' as const };
-        }
-      }
-      if (b.status === 'stay') {
-        const checkOutTime = b.checkOutTime || '12:00';
-        if (b.endDate < todayStr || (b.endDate === todayStr && currentTimeStr >= checkOutTime)) {
-          hasChanges = true;
-          return { ...b, status: 'checked_out' as const };
-        }
-      }
-      return b;
-    });
-
-    if (hasChanges) {
-      handleStateUpdate({ ...state, bookings: updatedBookings });
-      addLog('System Auto-Status', 'Multiple folios updated based on timeline');
-    }
-  }, [state, handleStateUpdate, addLog]);
-
+  // Fix: Definition moved above useEffect to avoid "used before its declaration" error.
   const performSync = useCallback(async (forceUpdate: boolean = false) => {
     if (isSyncing || !isSupabaseConfigured()) return;
     setIsSyncing(true);
@@ -184,6 +119,98 @@ const App: React.FC = () => {
       setIsSyncing(false);
     }
   }, [state, isSyncing]);
+
+  // Fix: Definition moved above useEffect to avoid "used before its declaration" error.
+  const runAutoStatusEngine = useCallback(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const currentTimeStr = now.toTimeString().slice(0, 5);
+    let hasChanges = false;
+    const updatedBookings = state.bookings.map(b => {
+      if (b.status === 'confirmed' || b.status === 'pending') {
+        const checkInTime = b.checkInTime || '14:00';
+        if (b.startDate < todayStr || (b.startDate === todayStr && currentTimeStr >= checkInTime)) {
+          hasChanges = true;
+          return { ...b, status: 'stay' as const };
+        }
+      }
+      if (b.status === 'stay') {
+        const checkOutTime = b.checkOutTime || '12:00';
+        if (b.endDate < todayStr || (b.endDate === todayStr && currentTimeStr >= checkOutTime)) {
+          hasChanges = true;
+          return { ...b, status: 'checked_out' as const };
+        }
+      }
+      return b;
+    });
+    if (hasChanges) {
+      handleStateUpdate({ ...state, bookings: updatedBookings });
+    }
+  }, [state, handleStateUpdate]);
+
+  const handleQuickSettle = (bookingId: string) => {
+    const booking = state.bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    const newState = {
+      ...state,
+      bookings: state.bookings.map(b => 
+        b.id === bookingId 
+          ? { ...b, paidAmount: b.totalAmount, paymentStatus: 'Paid' as const } 
+          : b
+      )
+    };
+    handleStateUpdate(newState);
+    addLog('Quick Settlement', `Folio ${booking.displayId} fully paid.`);
+  };
+
+  const handleFulfillService = (bookingId: string, serviceId: string, isExtra: boolean = false) => {
+    const booking = state.bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    const newState = {
+      ...state,
+      bookings: state.bookings.map(b => {
+        if (b.id !== bookingId) return b;
+        if (isExtra) {
+          return {
+            ...b,
+            extraServices: b.extraServices.map(es => es.id === serviceId ? { ...es, isFulfilled: true } : es)
+          };
+        } else {
+          const alreadyFulfilled = b.fulfilledServices || [];
+          if (alreadyFulfilled.includes(serviceId)) return b;
+          return {
+            ...b,
+            fulfilledServices: [...alreadyFulfilled, serviceId]
+          };
+        }
+      })
+    };
+    handleStateUpdate(newState);
+    addLog('Service Fulfillment', `Service ${serviceId} completed for ${booking.displayId}`);
+  };
+
+  const handleAddBooking = (b: Omit<Booking, 'id' | 'displayId'>, nc?: Omit<Customer, 'id'>) => {
+    let finalCustomerId = b.customerId;
+    let customers = [...state.customers];
+    if (nc) {
+      const newCustomerRecord: Customer = { ...nc, id: Math.random().toString(36).substr(2, 9) };
+      finalCustomerId = newCustomerRecord.id;
+      customers.push(newCustomerRecord);
+    }
+    const newBooking: Booking = { 
+      ...b as Booking, 
+      id: Math.random().toString(36).substr(2, 9), 
+      displayId: generateDisplayId(),
+      customerId: finalCustomerId, 
+      extraServices: [],
+      fulfilledServices: [] 
+    };
+    const newState = { ...state, customers, bookings: [...state.bookings, newBooking] };
+    handleStateUpdate(newState);
+    addLog('New Booking Saved', `Record ${newBooking.displayId} created for Unit ${state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}`);
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -218,7 +245,7 @@ const App: React.FC = () => {
       if (syncTimerRef.current) clearInterval(syncTimerRef.current);
       if (autoStatusTimerRef.current) clearInterval(autoStatusTimerRef.current);
     };
-  }, [isInitialLoading, user, performSync, runAutoStatusEngine]);
+  }, [isInitialLoading, user, performSync, state, runAutoStatusEngine]);
 
   const handleUpdateBooking = (id: string, updates: Partial<Booking>) => {
     const newState = { ...state, bookings: state.bookings.map(b => b.id === id ? { ...b, ...updates } : b) };
@@ -227,10 +254,13 @@ const App: React.FC = () => {
   };
 
   const handleAddStayService = (bookingId: string, serviceId: string, paymentMethod: string, isPaid: boolean) => {
+    const booking = state.bookings.find(b => b.id === bookingId);
     const serviceTemplate = state.services.find(s => s.id === serviceId);
-    if (!serviceTemplate) return;
+    if (!booking || !serviceTemplate) return;
+    
     const newStayService: StayService = {
       id: Math.random().toString(36).substr(2, 9),
+      bookingId: booking.id,
       serviceId, name: serviceTemplate.name, price: serviceTemplate.price,
       date: new Date().toISOString().split('T')[0], paymentMethod, isPaid,
       isFulfilled: false
@@ -246,41 +276,7 @@ const App: React.FC = () => {
       })
     };
     handleStateUpdate(newState);
-    addLog('Add Service', `Room Service Added`);
-  };
-
-  const handleUpdateCustomer = (id: string, updates: Partial<Customer>) => {
-    const newState = { ...state, customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c) };
-    handleStateUpdate(newState);
-    addLog('Update Customer', `Customer ${updates.name || id} modified`);
-  };
-
-  const handleDeleteCustomer = (id: string) => {
-    const hasBookings = state.bookings.some(b => b.customerId === id);
-    if (hasBookings) { alert("Cannot delete customer with existing bookings."); return; }
-    const newState = { ...state, customers: state.customers.filter(c => c.id !== id) };
-    handleStateUpdate(newState);
-    addLog('Delete Customer', `ID: ${id}`);
-  };
-
-  const handleAddBooking = (b: Omit<Booking, 'id'>, nc?: Omit<Customer, 'id'>) => {
-    let finalCustomerId = b.customerId;
-    let customers = [...state.customers];
-    if (nc) {
-      const newCustomerRecord: Customer = { ...nc, id: Math.random().toString(36).substr(2, 9) };
-      finalCustomerId = newCustomerRecord.id;
-      customers.push(newCustomerRecord);
-    }
-    const newBooking: Booking = { 
-      ...b as Booking, 
-      id: Math.random().toString(36).substr(2, 9), 
-      customerId: finalCustomerId, 
-      extraServices: [],
-      fulfilledServices: [] 
-    };
-    const newState = { ...state, customers, bookings: [...state.bookings, newBooking] };
-    handleStateUpdate(newState);
-    addLog('New Booking Saved', `Unit ${state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}`);
+    addLog('Add Service', `Amenity Added to ${booking.displayId}`);
   };
 
   if (isInitialLoading) {
@@ -337,7 +333,7 @@ const App: React.FC = () => {
       {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} />}
       {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => handleStateUpdate({...state, apartments: [...state.apartments, {...a, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, apartments: state.apartments.map(a => a.id === id ? {...a, ...u} : a)})} onDelete={(id) => handleStateUpdate({...state, apartments: state.apartments.filter(a => a.id !== id)})} />}
       {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})} />}
-      {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={handleUpdateCustomer} onDeleteCustomer={handleDeleteCustomer} permissions={user.permissions} />}
+      {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={(id, u) => handleStateUpdate({...state, customers: state.customers.map(c => c.id === id ? {...c, ...u} : c)})} onDeleteCustomer={id => handleStateUpdate({...state, customers: state.customers.filter(c => c.id !== id)})} permissions={user.permissions} />}
       {activeTab === 'maintenance' && <MaintenanceManagement expenses={state.expenses} apartments={state.apartments} onAddExpense={(exp) => handleStateUpdate({...state, expenses: [...state.expenses, {...exp, id: Math.random().toString(36).substr(2, 9)} ]})} onDeleteExpense={(id) => handleStateUpdate({...state, expenses: state.expenses.filter(e => e.id !== id)})} />}
       {activeTab === 'commissions' && <CommissionManagement state={state} onUpdateBooking={handleUpdateBooking} />}
       {activeTab === 'reports' && <Reports state={state} />}

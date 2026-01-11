@@ -1,5 +1,4 @@
 
-
 export type UserRole = 'admin' | 'reception';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Unpaid';
 export type BookingStatus = 'confirmed' | 'pending' | 'cancelled' | 'maintenance' | 'stay' | 'checked_out';
@@ -67,6 +66,7 @@ export interface ExtraService {
 
 export interface StayService {
   id: string;
+  bookingId: string; // رابط مباشر مع الحجز
   serviceId: string;
   name: string;
   price: number;
@@ -88,6 +88,7 @@ export interface Expense {
 
 export interface Booking {
   id: string;
+  displayId: string; // المعرف الذكي (مثل BH-A123)
   apartmentId: string;
   customerId: string;
   startDate: string;
@@ -102,7 +103,7 @@ export interface Booking {
   paidAmount: number;
   currency: Currency;
   status: BookingStatus;
-  services: string[];
+  services: string[]; // معرفات الخدمات الأساسية المختارة عند الحجز
   fulfilledServices: string[]; // تتبع الخدمات الأساسية التي تم تنفيذها
   extraServices: StayService[];
   totalAmount: number;
