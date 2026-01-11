@@ -3,7 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
 export const getSmartSummary = async (state: AppState) => {
-  // Use environment variable directly as per guidelines
   const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
@@ -11,23 +10,30 @@ export const getSmartSummary = async (state: AppState) => {
   }
 
   try {
-    // Initializing with named parameter as per guidelines
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = `
-      Analyze the following PMS data for Bahia Hurghada and provide a professional business summary.
-      Data:
-      - Total Apartments: ${state.apartments.length}
-      - Total Bookings: ${state.bookings.length}
-      - Total Customers: ${state.customers.length}
-      - Current Active Bookings: ${state.bookings.filter(b => b.status === 'confirmed').length}
-      
-      Recent Bookings Details (Sample): ${JSON.stringify(state.bookings.slice(-5))}
+    
+    const financialStats = {
+      totalRevenue: state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.paidAmount * 50 : b.paidAmount), 0),
+      totalExpenses: state.expenses.reduce((acc, e) => acc + (e.currency === 'USD' ? e.amount * 50 : e.amount), 0),
+      totalCommissions: state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.commissionAmount * 50 : b.commissionAmount), 0),
+      units: state.apartments.length,
+      activeStays: state.bookings.filter(b => b.status === 'stay').length
+    };
 
-      Please provide:
-      1. A short summary of the current occupancy.
-      2. Revenue insights.
-      3. Suggestions for improvements based on these numbers.
-      Keep the response concise and professional in English.
+    const prompt = `
+      Act as a world-class hospitality financial consultant for "Bahia Hurghada".
+      Current Financial Pulse:
+      - Estimated Gross Revenue: ${financialStats.totalRevenue} EGP
+      - Operational Expenses: ${financialStats.totalExpenses} EGP
+      - Staff/Channel Commissions: ${financialStats.totalCommissions} EGP
+      - Occupancy Rate: ${((financialStats.activeStays / financialStats.units) * 100).toFixed(1)}%
+      
+      Tasks:
+      1. Analyze the Net Profit Margin based on these numbers.
+      2. Identify if expenses are too high relative to revenue.
+      3. Provide 3 specific, sharp business tips to increase net profit (e.g., dynamic pricing, utility saving, or direct booking focus).
+      
+      Keep the tone professional, direct, and elite. English response.
     `;
 
     const response = await ai.models.generateContent({
@@ -37,10 +43,9 @@ export const getSmartSummary = async (state: AppState) => {
         thinkingConfig: { thinkingBudget: 0 }
       }
     });
-    // Use .text property directly
     return response.text;
   } catch (error) {
     console.error("Gemini Error:", error);
-    return "Could not generate smart summary at this moment. Please check your API limits.";
+    return "Could not generate financial analysis. Check connection.";
   }
 };

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserPlus, ShoppingCart, UserCheck, ArrowRight, ClipboardPlus, Calendar, ArrowDownRight, MoveRight, History, Percent, LayoutGrid, Globe, Smartphone, MessageCircle, Activity, Wallet, BellRing
+  TrendingUp, Users as UsersIcon, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserCheck, ArrowRight, History, Percent, LayoutGrid, Activity, Wallet, BellRing, CheckCircle2, MapPin, User
 } from 'lucide-react';
 import { AppState, Booking, BookingStatus, ExtraService } from '../types';
 import { getSmartSummary } from '../services/geminiService';
@@ -20,20 +20,19 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   const [smartSummary, setSmartSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [serviceModal, setServiceModal] = useState<{ open: boolean, bookingId: string }>({ open: false, bookingId: '' });
+  const [detailModal, setDetailModal] = useState<{ open: boolean, booking: Booking | null }>({ open: false, booking: null });
   const [newService, setNewService] = useState({ serviceId: '', paymentMethod: 'Cash', isPaid: true });
 
   const totals = useMemo(() => {
     let egp = 0;
     let usd = 0;
-    let comm = 0;
     state.bookings.forEach(b => {
       if (b.status !== 'cancelled' && b.status !== 'maintenance') {
         if (b.currency === 'USD') usd += b.paidAmount;
         else egp += b.paidAmount;
-        comm += b.commissionAmount;
       }
     });
-    return { egp, usd, comm };
+    return { egp, usd };
   }, [state.bookings]);
 
   const nextActions = useMemo(() => {
@@ -43,12 +42,9 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     const futureStr = future48h.toISOString().split('T')[0];
 
     const arrivals = state.bookings.filter(b => (b.status === 'confirmed' || b.status === 'pending') && b.startDate >= todayStr && b.startDate <= futureStr);
-    const departures = state.bookings.filter(b => b.status === 'stay' && b.endDate >= todayStr && b.endDate <= futureStr);
-
-    return { arrivals, departures };
+    return { arrivals };
   }, [state.bookings]);
 
-  // تنبيهات الخدمات (أيقونة جرس للخدمات المطلوبة في الحجوزات النشطة)
   const serviceAlerts = useMemo(() => {
     return state.bookings.filter(b => 
       (b.status === 'stay' || b.status === 'confirmed') && 
@@ -57,10 +53,10 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   }, [state.bookings]);
 
   const stats = [
-    { label: 'EGP Collected', value: `${totals.egp.toLocaleString()}`, icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'USD Collected', value: `${totals.usd.toLocaleString()}`, icon: DollarSign, color: 'text-sky-600', bg: 'bg-sky-50' },
-    { label: 'Commission Due', value: `${totals.comm.toLocaleString()}`, icon: Percent, color: 'text-rose-600', bg: 'bg-rose-50' },
-    { label: 'Current Guests', value: state.bookings.filter(b => b.status === 'stay').length, icon: UserCheck, color: 'text-slate-900', bg: 'bg-slate-100' },
+    { label: 'EGP Liquidity', value: `${totals.egp.toLocaleString()}`, icon: Banknote, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'USD Liquidity', value: `${totals.usd.toLocaleString()}`, icon: DollarSign, color: 'text-sky-600', bg: 'bg-sky-50' },
+    { label: 'Active Keys', value: state.bookings.filter(b => b.status === 'stay').length, icon: UserCheck, color: 'text-slate-900', bg: 'bg-slate-100' },
+    { label: 'Units Ready', value: state.apartments.length - state.bookings.filter(b => b.status === 'stay' || b.status === 'maintenance').length, icon: Building2, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   const currentStayBookings = state.bookings.filter(b => b.status === 'stay');
@@ -73,20 +69,20 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
            <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <p className="text-slate-400 font-black text-[9px] uppercase tracking-[0.3em] flex items-center gap-2">
-                Bahia Hurghada Management System v13.0 
-                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Financial Engine Precision</span>
+                Bahia Intelligence Terminal v14.0 
+                <span className="flex items-center gap-1 text-emerald-600 border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 rounded text-[7px]"><Activity className="w-2 h-2" /> Operations Focused</span>
               </p>
            </div>
-           <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Operations <span className="text-sky-600">Overview</span></h2>
+           <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Command <span className="text-sky-600">Center</span></h2>
         </div>
         
         <div className="flex items-center gap-3 w-full lg:w-auto">
           <button onClick={async () => { setIsLoadingSummary(true); setSmartSummary(await getSmartSummary(state)); setIsLoadingSummary(false); }} disabled={isLoadingSummary} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-xl font-black text-[10px] shadow-lg hover:bg-sky-600 transition-all uppercase tracking-widest">
             {isLoadingSummary ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            AI Business Intel
+            AI Analysis
           </button>
           <button onClick={() => onTabChange?.('calendar')} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-sky-500 text-white px-5 py-2.5 rounded-xl font-black text-[10px] shadow-lg hover:bg-sky-600 transition-all uppercase tracking-widest">
-            <Plus className="w-3.5 h-3.5" /> New Reservation
+            <Plus className="w-3.5 h-3.5" /> Book Now
           </button>
         </div>
       </div>
@@ -94,8 +90,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <div key={i} className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group hover:border-sky-500 transition-all">
-            <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110`}>
+          <div key={i} className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm group hover:border-sky-500 transition-all">
+            <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
               <stat.icon className="w-5 h-5" />
             </div>
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{stat.label}</p>
@@ -106,26 +102,26 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Service Alerts Section */}
+          {/* Service Alerts - NEW FAST MODAL TRIGGER */}
           <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2.5rem] shadow-sm">
              <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-amber-500 text-white rounded-lg shadow-sm"><BellRing className="w-4 h-4" /></div>
-                <h3 className="text-xs font-black uppercase tracking-tighter text-amber-900">Requested Amenities Awareness</h3>
+                <h3 className="text-xs font-black uppercase tracking-tighter text-amber-900">Amenity Fulfillment Queue</h3>
              </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {serviceAlerts.length > 0 ? serviceAlerts.slice(0, 4).map(b => (
-                   <div key={b.id} onClick={() => onOpenDetails(b.id)} className="bg-white p-4 rounded-2xl border border-amber-100 flex items-center justify-between cursor-pointer hover:bg-amber-100/50 transition-all group">
+                   <div key={b.id} onClick={() => setDetailModal({ open: true, booking: b })} className="bg-white p-4 rounded-2xl border border-amber-100 flex items-center justify-between cursor-pointer hover:bg-amber-100/50 transition-all group">
                       <div className="flex items-center gap-3">
                          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-black text-[10px] border border-amber-100">U-{state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}</div>
                          <div className="min-w-0">
                             <p className="text-[11px] font-black text-slate-900 truncate uppercase">{state.customers.find(c => c.id === b.customerId)?.name}</p>
-                            <p className="text-[8px] font-bold text-amber-600 uppercase">Services Pending Prep</p>
+                            <p className="text-[8px] font-bold text-amber-600 uppercase">Click for Service Details</p>
                          </div>
                       </div>
                       <ArrowRight className="w-4 h-4 text-amber-300 group-hover:text-amber-500" />
                    </div>
                 )) : (
-                  <div className="col-span-2 py-4 text-center opacity-30 font-black text-[8px] uppercase tracking-widest">No pending service preparations</div>
+                  <div className="col-span-2 py-4 text-center opacity-30 font-black text-[8px] uppercase tracking-widest">No pending service requests</div>
                 )}
              </div>
           </div>
@@ -134,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
              <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-50">
                 <div className="flex items-center gap-3">
                    <div className="p-2 bg-sky-100 rounded-lg text-sky-600"><LayoutGrid className="w-4 h-4" /></div>
-                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Live Operations (48h)</h3>
+                   <h3 className="text-sm font-black text-slate-900 uppercase tracking-tighter">Operation Hotlist</h3>
                 </div>
              </div>
              
@@ -151,26 +147,23 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                                <div className="w-9 h-9 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-emerald-600 shadow-sm font-black text-[11px]">U-{state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}</div>
                                <div className="min-w-0">
                                   <p className="text-[12px] font-black text-slate-900 truncate uppercase">{state.customers.find(c => c.id === b.customerId)?.name}</p>
-                                  <p className={`text-[8px] font-bold uppercase ${b.totalAmount - b.paidAmount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>Balance: {b.totalAmount - b.paidAmount} {b.currency}</p>
+                                  <p className={`text-[8px] font-bold uppercase ${b.totalAmount - b.paidAmount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>Due: {b.totalAmount - b.paidAmount}</p>
                                </div>
                             </div>
-                            <div className="flex gap-1">
-                               {b.totalAmount - b.paidAmount > 0 && (
-                                  <button onClick={() => onQuickSettle?.(b.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Settle Balance">
-                                     <Wallet className="w-3.5 h-3.5" />
-                                  </button>
-                               )}
-                               <button onClick={() => onOpenDetails(b.id)} className="p-2 text-slate-300 hover:text-slate-950 transition-all"><MoveRight className="w-4 h-4" /></button>
-                            </div>
+                            {b.totalAmount - b.paidAmount > 0 && (
+                                <button onClick={() => onQuickSettle?.(b.id)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
+                                    <Wallet className="w-3.5 h-3.5" />
+                                </button>
+                            )}
                          </div>
                       ))}
                    </div>
                 </div>
 
-                {/* In-House Guests with Quick Settle */}
+                {/* In-House */}
                 <div className="space-y-4">
                    <p className="text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] flex items-center gap-2">
-                     <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Current In-House ({currentStayBookings.length})
+                     <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span> In-House Guests ({currentStayBookings.length})
                    </p>
                    <div className="space-y-2">
                       {currentStayBookings.map(b => (
@@ -179,29 +172,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                                <div className="w-9 h-9 rounded-xl bg-white border border-sky-200 flex items-center justify-center text-sky-600 shadow-sm font-black text-[11px]">U-{state.apartments.find(a => a.id === b.apartmentId)?.unitNumber}</div>
                                <div className="min-w-0">
                                   <p className="text-[12px] font-black text-slate-900 truncate uppercase">{state.customers.find(c => c.id === b.customerId)?.name}</p>
-                                  <p className={`text-[8px] font-bold uppercase ${b.totalAmount - b.paidAmount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>Balance: {b.totalAmount - b.paidAmount} {b.currency}</p>
+                                  <p className={`text-[8px] font-bold uppercase ${b.totalAmount - b.paidAmount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>Bal: {b.totalAmount - b.paidAmount}</p>
                                </div>
                             </div>
-                            <div className="flex gap-1">
-                               {b.totalAmount - b.paidAmount > 0 && (
-                                  <button onClick={() => onQuickSettle?.(b.id)} className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm" title="Settle Balance">
-                                     <Wallet className="w-3.5 h-3.5" />
-                                  </button>
-                               )}
-                               <button onClick={() => setServiceModal({ open: true, bookingId: b.id })} className="p-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-all shadow-sm">
-                                  <Zap className="w-3.5 h-3.5" />
-                               </button>
-                            </div>
+                            <button onClick={() => setServiceModal({ open: true, bookingId: b.id })} className="p-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-all shadow-sm">
+                                <Zap className="w-3.5 h-3.5" />
+                            </button>
                          </div>
                       ))}
-                      {currentStayBookings.length === 0 && <div className="py-10 text-center opacity-20 font-black text-[10px] uppercase tracking-widest">No guests in-house</div>}
                    </div>
                 </div>
              </div>
           </div>
         </div>
 
-        {/* System Logs Feed */}
+        {/* System Pulse */}
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
@@ -209,12 +194,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
               <h3 className="text-sm font-black uppercase text-slate-900 tracking-tighter">System Pulse</h3>
             </div>
             <div className="space-y-5">
-              {state.bookings.slice(-8).reverse().map((b, i) => (
+              {state.bookings.slice(-6).reverse().map((b, i) => (
                 <div key={i} className="flex gap-4 cursor-pointer group" onClick={() => onOpenDetails(b.id)}>
                   <div className={`w-1 h-10 rounded-full shrink-0 ${b.status === 'cancelled' ? 'bg-rose-500' : 'bg-sky-500'}`}></div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-black truncate uppercase group-hover:text-sky-400 transition-colors">{state.customers.find(c => c.id === b.customerId)?.name || 'Guest'}</p>
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Unit {state.apartments.find(a => a.id === b.apartmentId)?.unitNumber} • {b.platform}</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Room {state.apartments.find(a => a.id === b.apartmentId)?.unitNumber} • {b.platform}</p>
                   </div>
                 </div>
               ))}
@@ -223,49 +208,85 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         </div>
       </div>
 
-      {/* Service Modal */}
+      {/* Amenity Detail Modal - FAST VIEW ONLY */}
+      {detailModal.open && detailModal.booking && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[2000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95 border-2 border-slate-950">
+             <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3 text-amber-600">
+                   <BellRing className="w-8 h-8" />
+                   <h3 className="text-2xl font-black tracking-tighter uppercase">Amenity Order</h3>
+                </div>
+                <button onClick={() => setDetailModal({ open: false, booking: null })} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-900"><X className="w-8 h-8" /></button>
+             </div>
+             
+             <div className="space-y-6">
+                <div className="flex items-center gap-5 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                   <div className="w-16 h-16 bg-slate-950 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg">
+                      <span className="text-[9px] font-black uppercase opacity-40">Unit</span>
+                      <span className="text-2xl font-black">{state.apartments.find(a => a.id === detailModal.booking!.apartmentId)?.unitNumber}</span>
+                   </div>
+                   <div className="min-w-0">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">In-House Guest</p>
+                      <h4 className="text-xl font-black text-slate-900 uppercase truncate">{state.customers.find(c => c.id === detailModal.booking!.customerId)?.name}</h4>
+                   </div>
+                </div>
+
+                <div className="space-y-3">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2">Requested Service Package</p>
+                   <div className="bg-sky-50 p-6 rounded-2xl border border-sky-100 space-y-4">
+                      {detailModal.booking.services.map(sid => {
+                         const s = state.services.find(x => x.id === sid);
+                         return s ? (
+                            <div key={s.id} className="flex items-center justify-between border-b border-sky-200/50 pb-3 last:border-0 last:pb-0">
+                               <span className="font-black text-sky-900 uppercase text-xs">{s.name}</span>
+                               <span className="font-black text-sky-600 text-[10px]">{s.price} EGP</span>
+                            </div>
+                         ) : null;
+                      })}
+                      {detailModal.booking.extraServices?.map(s => (
+                         <div key={s.id} className="flex items-center justify-between border-b border-sky-200/50 pb-3 last:border-0 last:pb-0">
+                            <span className="font-black text-sky-900 uppercase text-xs">{s.name}</span>
+                            <span className="px-2 py-0.5 bg-emerald-500 text-white rounded text-[7px] font-black uppercase">{s.isPaid ? 'PAID' : 'DUE'}</span>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                   <Clock className="w-4 h-4 text-sky-500" />
+                   <span className="text-[10px] font-black uppercase">Fulfillment Window: {detailModal.booking.startDate} (Expected ASAP)</span>
+                </div>
+
+                <button onClick={() => setDetailModal({ open: false, booking: null })} className="w-full py-5 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl flex items-center justify-center gap-3">
+                   <CheckCircle2 className="w-5 h-5" /> Mark as Fulfilled
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Service Add Modal */}
       {serviceModal.open && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border-2 border-slate-950 animate-in zoom-in-95">
+          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border-2 border-slate-950">
              <div className="flex justify-between items-center mb-6">
                 <div className="flex items-center gap-3">
                    <Zap className="w-6 h-6 text-sky-500" />
                    <h3 className="text-xl font-black text-slate-950 tracking-tighter uppercase">Room Service</h3>
                 </div>
-                <button onClick={() => setServiceModal({ open: false, bookingId: '' })} className="p-2 hover:bg-slate-100 rounded-full transition-all"><X className="w-6 h-6" /></button>
+                <button onClick={() => setServiceModal({ open: false, bookingId: '' })} className="p-2 hover:bg-slate-100 rounded-full"><X className="w-6 h-6" /></button>
              </div>
-             
              <div className="space-y-4">
-                <div className="space-y-1">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Choose Service</label>
-                   <select className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-xs outline-none" value={newService.serviceId} onChange={e => setNewService({...newService, serviceId: e.target.value})}>
-                      <option value="">Select Service...</option>
-                      {state.services.map(s => <option key={s.id} value={s.id}>{s.name} ({s.price} EGP)</option>)}
-                   </select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Collection</label>
-                     <select className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-xs outline-none" value={newService.paymentMethod} onChange={e => setNewService({...newService, paymentMethod: e.target.value})}>
-                        {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                        <option value="Room Charge">Room Charge</option>
-                     </select>
-                  </div>
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Status</label>
-                     <button onClick={() => setNewService({...newService, isPaid: !newService.isPaid})} className={`w-full p-4 rounded-2xl border-2 font-black text-xs flex items-center justify-center gap-2 transition-all ${newService.isPaid ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-rose-50 border-rose-100 text-rose-600'}`}>
-                        {newService.isPaid ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-                        {newService.isPaid ? 'PAID' : 'PENDING'}
-                     </button>
-                  </div>
-                </div>
+                <select className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black text-xs" value={newService.serviceId} onChange={e => setNewService({...newService, serviceId: e.target.value})}>
+                   <option value="">Select Service...</option>
+                   {state.services.map(s => <option key={s.id} value={s.id}>{s.name} ({s.price} EGP)</option>)}
+                </select>
                 <button onClick={() => { 
                    if(!newService.serviceId) return;
                    onAddService(serviceModal.bookingId, newService.serviceId, newService.paymentMethod, newService.isPaid);
                    setServiceModal({ open: false, bookingId: '' });
-                }} className="w-full py-5 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-sky-600 transition-all shadow-xl mt-4">
-                   Deliver & Add to Folio
-                </button>
+                }} className="w-full py-5 bg-slate-950 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-sky-600 transition-all">Add to Folio</button>
              </div>
           </div>
         </div>
