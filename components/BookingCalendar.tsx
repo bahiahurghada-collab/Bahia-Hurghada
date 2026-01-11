@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { 
   ChevronLeft, ChevronRight, Calendar as CalIcon, X, 
-  User as UserIcon, Clock, CheckCircle2, PlusCircle, User
+  User as UserIcon, Clock, CheckCircle2, PlusCircle, User, Info, Globe, MessageSquare
 } from 'lucide-react';
 import { Apartment, Booking } from '../types';
 
@@ -12,9 +12,10 @@ interface CalendarProps {
   onBookingInitiate: (aptId: string, start: string, end: string) => void;
   onEditBooking: (id: string) => void;
   customers?: any[]; // For getting names
+  state?: any; // To get customer names easily
 }
 
-const BookingCalendar: React.FC<CalendarProps> = ({ apartments, bookings, onBookingInitiate, onEditBooking }) => {
+const BookingCalendar: React.FC<CalendarProps> = ({ apartments, bookings, onBookingInitiate, onEditBooking, state }) => {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   
@@ -68,7 +69,7 @@ const BookingCalendar: React.FC<CalendarProps> = ({ apartments, bookings, onBook
           <div className="p-3 bg-slate-950 rounded-xl text-white shadow-md"><CalIcon className="w-5 h-5" /></div>
           <div>
             <h2 className="text-xl font-black text-slate-950 tracking-tighter uppercase leading-none">{monthName}</h2>
-            <p className="text-slate-400 font-bold text-[8px] uppercase tracking-[0.2em] mt-1">Occupancy Matrix V6</p>
+            <p className="text-slate-400 font-bold text-[8px] uppercase tracking-[0.2em] mt-1">Occupancy Matrix V10</p>
           </div>
         </div>
 
@@ -131,14 +132,39 @@ const BookingCalendar: React.FC<CalendarProps> = ({ apartments, bookings, onBook
                         className={`h-14 border-r border-slate-100 cursor-pointer relative transition-all group/cell ${isToday ? 'bg-sky-50/30' : 'hover:bg-slate-50'} ${isSelected ? 'bg-sky-100' : ''} ${isInSelectionRange ? 'bg-sky-50' : ''}`}
                       >
                         {booking && (
-                          <div className={`absolute inset-0.5 rounded-lg flex items-center px-1 overflow-hidden shadow-sm border border-black/5 transition-all group-hover/cell:scale-105 group-hover/cell:z-10 ${
+                          <div className={`absolute inset-0.5 rounded-lg flex items-center px-1 overflow-visible shadow-sm border border-black/5 transition-all group-hover/cell:scale-105 group-hover/cell:z-50 ${
                             booking.status === 'stay' ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white'
                           }`}>
-                            <div className="flex flex-col w-full">
-                               {isStart && <span className="text-[6px] font-black uppercase tracking-[0.2em] opacity-40 leading-none mb-0.5">Checked In</span>}
+                            <div className="flex flex-col w-full relative">
+                               {isStart && <span className="text-[6px] font-black uppercase tracking-[0.2em] opacity-40 leading-none mb-0.5">Start</span>}
                                <span className="text-[7px] font-black truncate uppercase leading-none">
                                   {isStart ? 'BOOKED' : '•'}
                                </span>
+
+                               {/* Tooltip Card on Hover */}
+                               <div className="absolute top-full left-0 mt-2 w-64 bg-white border-2 border-slate-950 p-5 rounded-2xl shadow-2xl opacity-0 invisible group-hover/cell:opacity-100 group-hover/cell:visible transition-all z-[100] text-slate-900 pointer-events-none scale-95 group-hover/cell:scale-100">
+                                  <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100">
+                                     <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-black text-[10px]">U-{apt.unitNumber}</div>
+                                     <div className="min-w-0">
+                                        <p className="text-[10px] font-black uppercase truncate">{state?.customers?.find((c: any) => c.id === booking.customerId)?.name || 'Guest'}</p>
+                                        <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">{booking.startDate} to {booking.endDate}</p>
+                                     </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                     <div className="flex items-center gap-2 text-[8px] font-black uppercase text-sky-600">
+                                        <Globe className="w-2.5 h-2.5" /> Channel: {booking.platform}
+                                     </div>
+                                     {booking.notes && (
+                                       <div className="flex items-start gap-2 text-[8px] font-bold text-slate-500 bg-slate-50 p-2 rounded-lg leading-relaxed">
+                                          <MessageSquare className="w-2.5 h-2.5 text-slate-300 shrink-0" />
+                                          <span className="italic">"{booking.notes}"</span>
+                                       </div>
+                                     )}
+                                     <div className={`text-[8px] font-black uppercase px-2 py-1 rounded-md w-fit ${booking.status === 'stay' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                                        Status: {booking.status}
+                                     </div>
+                                  </div>
+                               </div>
                             </div>
                           </div>
                         )}
