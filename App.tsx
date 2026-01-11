@@ -95,6 +95,22 @@ const App: React.FC = () => {
     });
   }, []);
 
+  const handleQuickSettle = (bookingId: string) => {
+    const booking = state.bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    const newState = {
+      ...state,
+      bookings: state.bookings.map(b => 
+        b.id === bookingId 
+          ? { ...b, paidAmount: b.totalAmount, paymentStatus: 'Paid' as const } 
+          : b
+      )
+    };
+    handleStateUpdate(newState);
+    addLog('Quick Settlement', `Folio for ${state.customers.find(c => c.id === booking.customerId)?.name} fully paid.`);
+  };
+
   const runAutoStatusEngine = useCallback(() => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -288,7 +304,7 @@ const App: React.FC = () => {
         onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})}
         onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})}
       />
-      {activeTab === 'dashboard' && <Dashboard state={state} onAddService={handleAddStayService} onUpdateBooking={handleUpdateBooking} onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} onTabChange={setActiveTab} />}
+      {activeTab === 'dashboard' && <Dashboard state={state} onAddService={handleAddStayService} onUpdateBooking={handleUpdateBooking} onOpenDetails={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} onTabChange={setActiveTab} onQuickSettle={handleQuickSettle} />}
       {activeTab === 'calendar' && <BookingCalendar apartments={state.apartments} bookings={state.bookings} onBookingInitiate={(aptId, start, end) => { setBookingInitialData({ aptId, start, end }); setIsBookingModalOpen(true); }} onEditBooking={(id) => { setEditBookingId(id); setIsBookingModalOpen(true); }} />}
       {activeTab === 'apartments' && <Apartments apartments={state.apartments} userRole={user.role} onAdd={(a) => handleStateUpdate({...state, apartments: [...state.apartments, {...a, id: Math.random().toString(36).substr(2, 9)} ]})} onUpdate={(id, u) => handleStateUpdate({...state, apartments: state.apartments.map(a => a.id === id ? {...a, ...u} : a)})} onDelete={(id) => handleStateUpdate({...state, apartments: state.apartments.filter(a => a.id !== id)})} />}
       {activeTab === 'bookings' && <Bookings state={state} userRole={user.role} userName={user.name} onAddBooking={handleAddBooking} onUpdateBooking={handleUpdateBooking} onCancelBooking={(id) => handleUpdateBooking(id, {status: 'cancelled'})} onDeleteBooking={(id) => handleStateUpdate({...state, bookings: state.bookings.filter(b => b.id !== id)})} />}
