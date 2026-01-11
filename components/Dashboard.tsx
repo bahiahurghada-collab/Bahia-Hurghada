@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign
+  TrendingUp, Users as UsersIcon, CalendarCheck, Banknote, Sparkles, Loader2, Clock, Zap, Plus, X, ConciergeBell, Eye, ShieldCheck, ArrowUpRight, Building2, CheckCircle, CreditCard, DollarSign, UserPlus, ShoppingCart
 } from 'lucide-react';
 import { AppState, Booking, BookingStatus, ExtraService } from '../types';
 import { getSmartSummary } from '../services/geminiService';
@@ -56,10 +56,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
     { label: 'Guest Pool', value: state.customers.length, icon: UsersIcon, bg: 'bg-white', target: 'customers' },
   ];
 
-  // Current stays for the quick service add button
   const currentStays = useMemo(() => state.bookings.filter(b => b.status === 'stay'), [state.bookings]);
 
-  // Services tracker logic
   const recentExtraServices = useMemo(() => {
     const list: Array<{guest: string, room: string, service: string, price: number, currency: string, date: string, isPaid: boolean, method: string}> = [];
     state.bookings.filter(b => b.extraServices && b.extraServices.length > 0).forEach(b => {
@@ -78,7 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         });
       });
     });
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
   }, [state.bookings, state.customers, state.apartments]);
 
   const logistics48H = useMemo(() => {
@@ -86,10 +84,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
       if (b.status === 'cancelled' || b.status === 'checked_out' || b.status === 'maintenance') return false;
       const isArrivalWindow = b.startDate === todayStr || b.startDate === tomorrowStr;
       const isDepartureWindow = b.endDate === todayStr || b.endDate === tomorrowStr;
-      
       const isPendingArrival = isArrivalWindow && b.status === 'confirmed';
       const isActiveDeparture = isDepartureWindow && b.status === 'stay';
-      
       return isPendingArrival || isActiveDeparture;
     }).map(b => {
       const targetDate = (b.startDate === todayStr || b.startDate === tomorrowStr) && b.status === 'confirmed' ? b.startDate : b.endDate;
@@ -111,25 +107,41 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
   };
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-700 pb-20">
-      <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
+    <div className="space-y-10 animate-in fade-in duration-700 pb-20">
+      <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
         <div>
           <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">Operations Hub</h2>
           <p className="text-slate-400 mt-3 font-bold text-[10px] flex items-center gap-2 uppercase tracking-[0.4em]">
             <ShieldCheck className="w-5 h-5 text-sky-600" /> Bahia Hurghada Intelligence
           </p>
         </div>
-        <button 
-          onClick={handleGenerateSummary}
-          disabled={isLoadingSummary}
-          className="flex items-center gap-3 bg-slate-900 text-white px-8 py-5 rounded-2xl font-black shadow-2xl hover:bg-black transition-all border-b-8 border-slate-950"
-        >
-          {isLoadingSummary ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5 text-sky-400" />}
-          SMART INSIGHTS
-        </button>
+        <div className="flex gap-3">
+            <button 
+              onClick={handleGenerateSummary}
+              disabled={isLoadingSummary}
+              className="flex items-center gap-3 bg-white text-slate-900 px-6 py-4 rounded-2xl font-black shadow-sm hover:shadow-md transition-all border border-slate-200"
+            >
+              {isLoadingSummary ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-sky-500" />}
+              AI INSIGHTS
+            </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      {/* Quick Access Actions */}
+      <div className="bg-slate-900 p-8 rounded-[3rem] shadow-2xl flex flex-wrap gap-4 items-center justify-center lg:justify-start border-b-8 border-slate-950">
+          <p className="text-white/40 font-black text-[10px] uppercase tracking-[0.3em] w-full lg:w-auto mr-4 text-center lg:text-left">Quick Actions:</p>
+          <button onClick={() => onTabChange?.('bookings')} className="flex items-center gap-3 bg-sky-500 text-white px-6 py-4 rounded-2xl font-black text-xs hover:bg-sky-400 transition-all shadow-lg">
+             <Plus className="w-5 h-5" /> NEW RESERVATION
+          </button>
+          <button onClick={() => onTabChange?.('team')} className="flex items-center gap-3 bg-white/10 text-white px-6 py-4 rounded-2xl font-black text-xs hover:bg-white/20 transition-all border border-white/5">
+             <UserPlus className="w-5 h-5" /> ADD STAFF
+          </button>
+          <button onClick={() => onTabChange?.('maintenance')} className="flex items-center gap-3 bg-rose-500 text-white px-6 py-4 rounded-2xl font-black text-xs hover:bg-rose-400 transition-all shadow-lg">
+             <ShoppingCart className="w-5 h-5" /> LOG EXPENSE
+          </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, i) => (
           <button 
             key={i} 
@@ -146,24 +158,22 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 space-y-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
           
-          {/* Service Task Board */}
           <div className="bg-white p-10 rounded-[3rem] border-2 border-slate-100 shadow-sm">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-xl font-black text-slate-900 uppercase flex items-center gap-3"><ConciergeBell className="w-6 h-6 text-sky-600" /> Service tracker</h3>
               
               <div className="flex items-center gap-3">
-                 <span className="text-[10px] font-black text-slate-400 uppercase">Quick Boost:</span>
                  <div className="flex gap-2 overflow-x-auto pb-1 max-w-[300px] scrollbar-hide">
                     {currentStays.map(s => (
                        <button 
                          key={s.id} 
                          onClick={() => setSelectedStayForService(s)} 
-                         className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 text-slate-900 rounded-xl font-black text-[11px] border border-slate-100 hover:bg-slate-900 hover:text-white transition-all shadow-sm group/btn"
+                         className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 text-slate-900 rounded-xl font-black text-[11px] border border-slate-100 hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                        >
-                          <Plus className="w-3 h-3 group-hover/btn:scale-125 transition-transform" />
+                          <Plus className="w-3 h-3" />
                           <span>{state.apartments.find(a => a.id === s.apartmentId)?.unitNumber}</span>
                        </button>
                     ))}
@@ -213,7 +223,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
                         </span>
                         <span className="text-sky-400 font-black text-[9px] uppercase tracking-widest">{b.displayDate}</span>
                       </div>
-                      <p className="font-black text-base truncate text-white">{customer?.name} (Unit {apt?.unitNumber})</p>
+                      <p className="font-black text-base truncate text-white">{customer?.name || 'Technical Block'} (Unit {apt?.unitNumber})</p>
                     </div>
                     <button onClick={() => onOpenDetails(b.id)} className="p-3 bg-white text-slate-900 rounded-xl hover:bg-sky-400 hover:text-white transition-all shadow-lg"><Eye className="w-4 h-4" /></button>
                   </div>
@@ -227,7 +237,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAddService, onUpdateBook
         <div className="bg-white p-10 rounded-[3rem] border-2 border-slate-100 shadow-sm h-fit">
           <h3 className="text-xl font-black text-slate-900 mb-10 uppercase tracking-tighter border-b border-slate-50 pb-6">System Events</h3>
           <div className="space-y-6">
-            {state.bookings.slice(-8).reverse().map((b, i) => {
+            {state.bookings.slice(-6).reverse().map((b, i) => {
               const customer = state.customers.find(c => c.id === b.customerId);
               return (
                 <button key={i} className="w-full flex gap-4 border-b border-slate-50 pb-6 last:border-0 group cursor-pointer text-left" onClick={() => onOpenDetails(b.id)}>

@@ -5,7 +5,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bahia Hurghada | Premium PMS</title>
-    <!-- تم إبقاء Tailwind للاستخدام السريع، التحذير في الكونسول لا يعطل التطبيق -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
     <style>
@@ -13,15 +12,20 @@
         --primary-navy: #0f172a;
         --accent-sky: #0284c7;
       }
+      html, body, #root {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background-color: #020617;
+      }
       body {
         font-family: 'Inter', 'Cairo', sans-serif;
-        background-color: #020617; /* خلفية داكنة لتناسب شاشة التحميل */
         color: #f1f5f9;
-        margin: 0;
         overflow: hidden;
       }
       #root:empty::after {
-        content: "BAHIA SYSTEM LOADING...";
+        content: "BAHIA SYSTEM INITIALIZING...";
         position: fixed;
         inset: 0;
         display: flex;
@@ -35,6 +39,12 @@
         animation: pulse 1.5s infinite;
       }
       @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      
+      /* تحسين السكرول بار */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #334155; }
     </style>
     <script type="importmap">
 {
