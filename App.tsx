@@ -16,7 +16,7 @@ import SystemLogs from './components/SystemLogs';
 import { databaseService } from './services/databaseService';
 import { storageService } from './services/storageService';
 import { isSupabaseConfigured } from './services/supabaseClient';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShieldCheck, Lock, User as UserIcon, Building2, Sparkles, LogIn, ChevronRight } from 'lucide-react';
 
 const INITIAL_SERVICES: ExtraService[] = [
   { id: 's1', name: 'Standard Cleaning', price: 200, isFree: false },
@@ -41,7 +41,7 @@ const DEFAULT_ADMIN: User = {
 const INITIAL_STATE: AppState = {
   apartments: [], customers: [], bookings: [], services: INITIAL_SERVICES,
   expenses: [], logs: [], notifications: [], users: [DEFAULT_ADMIN], currentUser: null,
-  currentExchangeRate: 50.0 // Default fallback
+  currentExchangeRate: 50.0 
 };
 
 const SESSION_STORAGE_KEY = 'bahia_active_user_id';
@@ -78,7 +78,6 @@ const App: React.FC = () => {
       if (data && data.rates && data.rates.EGP) {
         const newRate = parseFloat(data.rates.EGP.toFixed(2));
         setState(prev => ({ ...prev, currentExchangeRate: newRate }));
-        addLog('Currency Update', `Exchange rate updated to ${newRate} EGP/USD`);
       }
     } catch (error) {
       console.error("Failed to fetch rate:", error);
@@ -107,7 +106,6 @@ const App: React.FC = () => {
     try {
       await databaseService.saveState(newState);
       setLastSyncTime(new Date());
-      setSyncError(null);
     } catch (err: any) {
       setSyncError(err.message);
     } finally {
@@ -182,7 +180,6 @@ const App: React.FC = () => {
           stateRef.current = result.state;
           setLastSyncTime(new Date());
         } else {
-          // If fresh start, try fetching initial rate
           fetchLiveExchangeRate();
         }
         const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -237,8 +234,7 @@ const App: React.FC = () => {
       setTimeout(() => triggerSync(newState), 0);
       return newState;
     });
-    addLog('Service Delivered', `Fulfillment for ${bookingId}`);
-  }, [triggerSync, addLog]);
+  }, [triggerSync]);
 
   const handleDeleteServiceRecord = useCallback((bookingId: string, recordId: string, isExtra: boolean) => {
     setState(prev => {
@@ -262,8 +258,7 @@ const App: React.FC = () => {
       setTimeout(() => triggerSync(newState), 0);
       return newState;
     });
-    addLog('Archive Cleanup', `Service record removed from ${bookingId}`);
-  }, [triggerSync, addLog]);
+  }, [triggerSync]);
 
   const handleAddBooking = (b: Omit<Booking, 'id' | 'displayId'>, nc?: Omit<Customer, 'id'>) => {
     let finalCustomerId = b.customerId;
@@ -284,7 +279,7 @@ const App: React.FC = () => {
     };
     const newState = { ...state, customers, bookings: [...state.bookings, newBooking] };
     handleStateUpdate(newState);
-    addLog('New Booking', `Record ${newBooking.displayId} saved`);
+    addLog('New Booking', `Folio ${newBooking.displayId}`);
   };
 
   const handleAddStayService = (bookingId: string, serviceId: string, paymentMethod: string, isPaid: boolean) => {
@@ -310,7 +305,7 @@ const App: React.FC = () => {
   if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-5xl font-black text-white tracking-tighter uppercase mb-8">BAHIA<span className="text-sky-500">.</span></div>
+        <div className="text-6xl font-black text-white tracking-tighter uppercase mb-8 animate-pulse">BAHIA<span className="text-sky-500">.</span></div>
         <Loader2 className="w-16 h-16 text-sky-500 animate-spin" />
       </div>
     );
@@ -318,25 +313,69 @@ const App: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
-        <div className="w-full max-w-[420px] bg-white/5 backdrop-blur-3xl rounded-[3rem] p-12 shadow-2xl border border-white/10 relative z-10">
-          <div className="text-center mb-12">
-            <div className="text-4xl font-black text-white tracking-tighter uppercase mb-2">BAHIA<span className="text-sky-500">.</span></div>
-            <p className="text-sky-400 font-black uppercase text-[10px] tracking-[0.4em]">SYSTEM TERMINAL</p>
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden font-bold">
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-sky-500/10 blur-[180px] rounded-full"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-indigo-500/10 blur-[180px] rounded-full"></div>
+        
+        <div className="w-full max-w-[460px] relative z-10 animate-in fade-in zoom-in duration-1000">
+          <div className="bg-white/5 backdrop-blur-3xl rounded-[4rem] p-12 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.6)] border border-white/10 text-center mb-8 relative">
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-24 h-24 bg-gradient-to-tr from-sky-500 to-indigo-600 rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-sky-500/30 border-4 border-[#020617] rotate-3">
+               <Building2 className="w-12 h-12 text-white" />
+            </div>
+            
+            <div className="mt-10">
+               <h1 className="text-5xl font-black text-white tracking-tighter uppercase mb-3 leading-none">
+                  BAHIA<span className="text-sky-400">.</span>
+               </h1>
+               <p className="text-sky-400/50 font-black uppercase text-[9px] tracking-[0.5em] mb-12">Authorized Terminal V21.5</p>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const found = state.users.find(u => u.username === loginUsername && u.password === loginPassword);
+              if (found) { 
+                setUser(found); 
+                localStorage.setItem(SESSION_STORAGE_KEY, found.id);
+                addLog('Session Started', found.name); 
+              }
+            }} className="space-y-5">
+              <div className="group relative">
+                <UserIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-sky-400 transition-colors" />
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="Employee Identifier" 
+                  className="w-full pl-14 pr-8 py-6 rounded-3xl border border-white/10 bg-white/5 text-white font-black text-sm outline-none focus:border-sky-500/50 focus:bg-white/[0.08] transition-all placeholder:text-white/20" 
+                  value={loginUsername} 
+                  onChange={e => setLoginUsername(e.target.value)} 
+                />
+              </div>
+              <div className="group relative">
+                <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-sky-400 transition-colors" />
+                <input 
+                  type="password" 
+                  required 
+                  placeholder="Secure Access Key" 
+                  className="w-full pl-14 pr-8 py-6 rounded-3xl border border-white/10 bg-white/5 text-white font-black text-sm outline-none focus:border-sky-500/50 focus:bg-white/[0.08] transition-all placeholder:text-white/20" 
+                  value={loginPassword} 
+                  onChange={e => setLoginPassword(e.target.value)} 
+                />
+              </div>
+              <button className="w-full group bg-white text-slate-950 py-6 rounded-3xl font-black uppercase tracking-[0.4em] hover:bg-sky-500 hover:text-white transition-all shadow-2xl text-[10px] mt-10 flex items-center justify-center gap-3 overflow-hidden relative">
+                 <ShieldCheck className="w-5 h-5 z-10" /> 
+                 <span className="z-10">Sign In to Dashboard</span>
+                 <div className="absolute right-[-20%] group-hover:right-[10%] opacity-0 group-hover:opacity-20 transition-all duration-500"><ChevronRight className="w-20 h-20" /></div>
+              </button>
+            </form>
           </div>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const found = state.users.find(u => u.username === loginUsername && u.password === loginPassword);
-            if (found) { 
-              setUser(found); 
-              localStorage.setItem(SESSION_STORAGE_KEY, found.id);
-              addLog('Login', found.name); 
-            }
-          }} className="space-y-6">
-            <input type="text" required placeholder="Staff Username" className="w-full px-8 py-5 rounded-2xl border border-white/10 bg-white/5 !text-white font-black text-sm outline-none" value={loginUsername} onChange={e => setLoginUsername(e.target.value)} />
-            <input type="password" required placeholder="Security Key" className="w-full px-8 py-5 rounded-2xl border border-white/10 bg-white/5 !text-white font-black text-sm outline-none" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} />
-            <button className="w-full bg-white text-slate-950 py-6 rounded-2xl font-black uppercase tracking-[0.2em] hover:bg-sky-500 hover:text-white transition-all shadow-xl text-xs">Authorize Entry</button>
-          </form>
+          
+          <div className="flex justify-between items-center px-10 opacity-30">
+             <div className="flex items-center gap-2">
+                <Sparkles className="w-3 h-3 text-sky-400" />
+                <span className="text-[8px] font-black uppercase text-white tracking-widest">Encrypted Cloud Link</span>
+             </div>
+             <span className="text-[8px] font-black uppercase text-white tracking-widest">HURGHADA RED SEA</span>
+          </div>
         </div>
       </div>
     );

@@ -36,8 +36,9 @@ export const getSmartSummary = async (state: AppState) => {
       Keep the tone professional, direct, and elite. English response.
     `;
 
+    // Upgraded to 'gemini-3-pro-preview' for complex financial reasoning
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
         thinkingConfig: { thinkingBudget: 0 }
