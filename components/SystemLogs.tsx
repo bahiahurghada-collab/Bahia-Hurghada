@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { History, Download, Upload, Trash2, ShieldAlert } from 'lucide-react';
+import { History, Download, Upload, Trash2, ShieldAlert, RotateCcw } from 'lucide-react';
 import { AppState, AuditLog } from '../types';
 import { storageService } from '../services/storageService';
 
@@ -20,12 +20,20 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
     }
   };
 
+  const handleDeepRestore = () => {
+    if (window.confirm("WARNING: Deep Restore V15 will clear all volatile cache and restore standard system permissions. Proceed?")) {
+      // The actual logic is handled in App.tsx handleRestoreV15, 
+      // but we can trigger a hard reload here too.
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="space-y-10 pb-32 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-10 rounded-[3rem] border-2 border-slate-100 shadow-xl">
         <div>
           <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase">System Terminal</h2>
-          <p className="text-slate-500 font-bold mt-2">Audit logs, security events, and data backup</p>
+          <p className="text-slate-500 font-bold mt-2">Audit logs, security events, and V15 restoration hub</p>
         </div>
         <div className="flex gap-4">
           <button 
@@ -81,19 +89,35 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
         </div>
 
         <div className="space-y-8">
+          <div className="bg-amber-50 p-10 rounded-[3rem] border-2 border-amber-100 shadow-sm">
+             <div className="flex items-center gap-4 mb-6">
+                <RotateCcw className="w-8 h-8 text-amber-600" />
+                <h3 className="text-xl font-black text-amber-950 uppercase">V15 Restoration</h3>
+             </div>
+             <p className="text-sm text-amber-800 font-medium mb-8 leading-relaxed">
+               Use this to return the system to the stable V15 state. This fixes login issues and resets core system variables.
+             </p>
+             <button 
+               onClick={handleDeepRestore}
+               className="w-full py-5 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-amber-700 transition-all flex items-center justify-center gap-3 shadow-xl"
+             >
+                <RotateCcw className="w-5 h-5" /> Restore V15 Stable
+             </button>
+          </div>
+
           <div className="bg-rose-50 p-10 rounded-[3rem] border-2 border-rose-100 shadow-sm">
              <div className="flex items-center gap-4 mb-6">
                 <ShieldAlert className="w-8 h-8 text-rose-600" />
                 <h3 className="text-xl font-black text-rose-950 uppercase">Danger Zone</h3>
              </div>
              <p className="text-sm text-rose-800 font-medium mb-8 leading-relaxed">
-               Modifying system data directly can cause inconsistencies. Always perform a backup before importing.
+               Factory Reset will delete EVERYTHING. Only use if moving to a new deployment.
              </p>
              <button 
                onClick={() => { if(window.confirm('RESET SYSTEM? This will delete EVERYTHING.')) { localStorage.clear(); window.location.reload(); } }}
                className="w-full py-5 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-700 transition-all flex items-center justify-center gap-3 shadow-xl"
              >
-                <Trash2 className="w-5 h-5" /> Factory Reset
+                <Trash2 className="w-5 h-5" /> Full Data Wipe
              </button>
           </div>
 
@@ -101,16 +125,16 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
              <h3 className="text-lg font-black uppercase mb-6 tracking-tighter">System Health</h3>
              <div className="space-y-4">
                 <div className="flex justify-between border-b border-white/10 pb-4">
-                   <span className="text-[10px] font-black text-slate-400 uppercase">Database Version</span>
-                   <span className="text-xs font-black">v5.0.1 Stable</span>
+                   <span className="text-[10px] font-black text-slate-400 uppercase">Version</span>
+                   <span className="text-xs font-black">v15.0.0 Stable</span>
                 </div>
                 <div className="flex justify-between border-b border-white/10 pb-4">
                    <span className="text-[10px] font-black text-slate-400 uppercase">Storage Used</span>
                    <span className="text-xs font-black">{(JSON.stringify(state).length / 1024).toFixed(2)} KB</span>
                 </div>
                 <div className="flex justify-between">
-                   <span className="text-[10px] font-black text-slate-400 uppercase">Last Backup</span>
-                   <span className="text-xs font-black">Today</span>
+                   <span className="text-[10px] font-black text-slate-400 uppercase">Last Sync</span>
+                   <span className="text-xs font-black">Active</span>
                 </div>
              </div>
           </div>

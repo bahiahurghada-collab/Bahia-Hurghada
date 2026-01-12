@@ -136,7 +136,8 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                      <div className="p-3 bg-white/10 rounded-2xl"><Wallet className="w-6 h-6 text-sky-400" /></div>
                      <h3 className="text-2xl font-black uppercase tracking-tighter">Treasury Liquidity Distribution</h3>
                   </div>
-                  <button onClick={() => exportCSV('treasury', ['Method', 'USD', 'EGP', 'TotalEGP'], Object.entries(finance.treasury).map(([k,v]) => [k, v.usd, v.egp, (v.egp + (v.usd * state.currentExchangeRate))]))} className="text-[10px] font-black uppercase bg-white/10 px-6 py-3 rounded-2xl hover:bg-sky-500 transition-all flex items-center gap-3 border border-white/10"><FileSpreadsheet className="w-4 h-4"/> Download CSV Matrix</button>
+                  {/* Fixed Error: Explicitly typed treasury entries to prevent 'unknown' property access */}
+                  <button onClick={() => exportCSV('treasury', ['Method', 'USD', 'EGP', 'TotalEGP'], (Object.entries(finance.treasury) as [string, { egp: number, usd: number }][]).map(([k,v]) => [k, v.usd, v.egp, (v.egp + (v.usd * state.currentExchangeRate))]))} className="text-[10px] font-black uppercase bg-white/10 px-6 py-3 rounded-2xl hover:bg-sky-500 transition-all flex items-center gap-3 border border-white/10"><FileSpreadsheet className="w-4 h-4"/> Download CSV Matrix</button>
                </div>
                <div className="overflow-x-auto">
                   <table className="w-full text-left font-bold">
@@ -149,7 +150,8 @@ const Reports: React.FC<{ state: AppState }> = ({ state }) => {
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-100">
-                        {Object.entries(finance.treasury).map(([method, val]) => (
+                        {/* Fixed Error: Explicitly typed treasury entries to prevent 'unknown' property access */}
+                        {(Object.entries(finance.treasury) as [string, { egp: number, usd: number }][]).map(([method, val]) => (
                            <tr key={method} className="hover:bg-slate-50 transition-all text-sm">
                               <td className="px-12 py-8 uppercase text-slate-950 font-black">{method}</td>
                               <td className="px-12 py-8 text-right text-sky-600 font-black">{val.usd.toLocaleString()} <span className="text-[10px] opacity-40">USD</span></td>
