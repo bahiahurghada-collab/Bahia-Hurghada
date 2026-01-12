@@ -1,8 +1,11 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Building2, ConciergeBell, Users, Wallet, TrendingUp, ChevronRight, Zap, Sparkles, Loader2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { 
+  Users, TrendingUp, LogIn, LogOut, Clock, 
+  Droplets, CheckCircle2, ChevronRight, Zap, 
+  CreditCard, Banknote, Plus
+} from 'lucide-react';
 import { AppState } from '../types';
-import { getSmartSummary } from '../services/geminiService';
 
 interface DashboardProps {
   state: AppState;
@@ -13,154 +16,196 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ state, onOpenDetails }) => {
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [currency, setCurrency] = useState<'EGP' | 'USD'>('EGP');
 
   const stats = useMemo(() => {
-    const activeBookings = state.bookings.filter(b => b.status === 'stay');
-    const totalRev = state.bookings.reduce((acc, b) => acc + (b.currency === 'USD' ? b.paidAmount * state.currentExchangeRate : b.paidAmount), 0);
+    const totalUnits = state.apartments.length || 1;
+    const occupied = state.bookings.filter(b => b.status === 'stay').length;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const arrivals = state.bookings.filter(b => b.startDate === todayStr).length;
+    const departures = state.bookings.filter(b => b.endDate === todayStr).length;
+    
     return {
-      active: activeBookings.length,
-      revenue: totalRev,
-      guests: state.customers.length,
-      units: state.apartments.length
+      occupancy: Math.round((occupied / totalUnits) * 100),
+      arrivals,
+      departures,
+      housekeeping: state.apartments.filter(a => a.status === 'MAINTENANCE').length
     };
   }, [state]);
 
-  const recentBookings = useMemo(() => {
-    return [...state.bookings].sort((a,b) => b.bookingDate.localeCompare(a.bookingDate)).slice(0, 5);
+  const recentMovements = useMemo(() => {
+    return [...state.bookings]
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      .slice(0, 6);
   }, [state.bookings]);
 
-  useEffect(() => {
-    const fetchAi = async () => {
-      if (state.bookings.length === 0) return;
-      setIsAiLoading(true);
-      try {
-        const insight = await getSmartSummary(state);
-        setAiInsight(insight);
-      } catch (e) {
-        setAiInsight("Unable to reach AI advisor at this moment.");
-      } finally {
-        setIsAiLoading(false);
+  const guestServices = useMemo(() => {
+    const services: any[] = [];
+    state.bookings.forEach(b => {
+      if (b.status === 'stay' || b.status === 'confirmed') {
+        const apt = state.apartments.find(a => a.id === b.apartmentId);
+        const cust = state.customers.find(c => c.id === b.customerId);
+        
+        b.services.forEach(sid => {
+          const sTemplate = state.services.find(s => s.id === sid);
+          if (sTemplate && !b.fulfilledServices.includes(sid)) {
+            services.push({
+              unit: apt?.unitNumber || '?',
+              service: sTemplate.name,
+              guest: cust?.name || 'Guest',
+              price: sTemplate.price,
+              currency: sTemplate.currency,
+              status: b.paymentStatus === 'Paid' ? 'PAID' : 'UNPAID'
+            });
+          }
+        });
       }
-    };
-    fetchAi();
-  }, [state.bookings.length, state.expenses.length]);
+    });
+    return services.slice(0, 5);
+  }, [state.bookings, state.services, state.apartments, state.customers]);
 
   return (
-    <div className="space-y-10 animate-fade-in pb-20">
-      {/* KPI GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm relative overflow-hidden group hover:border-sky-500 transition-all">
-          <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
-            <Wallet className="w-20 h-20" />
-          </div>
-          <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-3">Gross Revenue (EGP)</p>
-          <h3 className="text-4xl font-black text-slate-950 tracking-tighter">{stats.revenue.toLocaleString()}</h3>
+    <div className="space-y-8 animate-fade-in pb-20">
+      <div className="flex justify-between items-end mb-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Operations Center</h2>
+          <p className="text-slate-500 font-bold">Welcome back, team. Here's today's logistics overview.</p>
         </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm">
-          <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-3">Unit Occupancy</p>
-          <h3 className="text-4xl font-black text-slate-950 tracking-tighter">{stats.active} <span className="text-lg opacity-20">/ {stats.units}</span></h3>
-        </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 shadow-sm">
-          <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-3">Guest Database</p>
-          <h3 className="text-4xl font-black text-slate-950 tracking-tighter">{stats.guests}</h3>
-        </div>
-        <div className="bg-sky-500 p-8 rounded-[2.5rem] text-white shadow-xl shadow-sky-500/20 relative overflow-hidden">
-          <TrendingUp className="absolute -right-4 -bottom-4 w-32 h-32 opacity-10" />
-          <p className="text-[9px] font-black uppercase opacity-60 tracking-[0.2em] mb-3">Efficiency Index</p>
-          <h3 className="text-4xl font-black tracking-tighter">{stats.units > 0 ? Math.round((stats.active/stats.units)*100) : 0}%</h3>
+        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
+           <div className="px-4 py-2 bg-slate-50 rounded-xl flex items-center gap-2 border border-slate-100">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[10px] font-black uppercase text-slate-700">1 USD = {state.currentExchangeRate} EGP</span>
+           </div>
+           <div className="px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black uppercase text-slate-700 flex items-center gap-2">
+              <Clock className="w-3 h-3" /> {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 space-y-10">
-          {/* AI INSIGHT CARD - HIGH END UI */}
-          <div className="bg-slate-950 rounded-[3rem] p-10 text-white relative overflow-hidden border-b-8 border-sky-500 shadow-2xl">
-            <div className="absolute -right-10 -top-10 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl"></div>
-            <Sparkles className="absolute right-8 top-8 w-12 h-12 text-sky-400 animate-pulse opacity-40" />
-            <h3 className="text-xl font-black uppercase tracking-widest mb-6 flex items-center gap-3 relative z-10">
-              <span className="p-2 bg-sky-500 rounded-lg"><Zap className="w-5 h-5 text-white" /></span>
-              AI Business Intelligence
-            </h3>
-            {isAiLoading ? (
-              <div className="flex flex-col items-center justify-center py-10 gap-4 relative z-10">
-                <Loader2 className="w-10 h-10 animate-spin text-sky-400" />
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400">Analyzing Hurghada Market Pulse...</p>
-              </div>
-            ) : (
-              <div className="max-w-none relative z-10">
-                <p className="text-slate-300 font-bold leading-relaxed whitespace-pre-wrap text-sm italic">
-                  {aiInsight || "Add booking data to generate an automated financial net-profit analysis and operational tips."}
-                </p>
-              </div>
-            )}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {[
+          { label: 'Occupancy Rate', value: `${stats.occupancy}%`, sub: 'Active Stays', icon: Users, color: 'text-slate-600', bg: 'bg-slate-50' },
+          { label: 'Arrivals Today', value: stats.arrivals, sub: 'Expect check-ins', icon: LogIn, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+          { label: 'Departures Today', value: stats.departures, sub: 'Expect check-outs', icon: LogOut, color: 'text-amber-500', bg: 'bg-amber-50' },
+          { label: 'Maintenance', value: stats.housekeeping, sub: 'Units offline', icon: Droplets, color: 'text-rose-500', bg: 'bg-rose-50' },
+        ].map((s, i) => (
+          <div key={i} className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between group hover:border-slate-300 transition-all cursor-pointer">
+            <div>
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">{s.label}</p>
+              <h3 className="text-4xl font-black text-slate-800 tracking-tighter">{s.value}</h3>
+              <p className="text-[10px] font-bold text-slate-400 mt-2">{s.sub}</p>
+            </div>
+            <div className={`p-4 ${s.bg} ${s.color} rounded-2xl group-hover:scale-110 transition-transform`}>
+              <s.icon className="w-7 h-7" />
+            </div>
           </div>
+        ))}
+      </div>
 
-          {/* RECENT ACTIVITY */}
-          <div className="bg-white rounded-[3rem] border-2 border-slate-100 overflow-hidden shadow-sm">
-            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-lg font-black uppercase text-slate-950 tracking-tighter">Live Transaction Feed</h3>
-              <ConciergeBell className="text-slate-300 w-6 h-6" />
-            </div>
-            <div className="p-8 space-y-4">
-              {recentBookings.length > 0 ? recentBookings.map(b => (
-                <div key={b.id} className="p-5 bg-slate-50 rounded-3xl flex items-center justify-between hover:bg-slate-100 transition-all cursor-pointer group border-2 border-transparent hover:border-slate-200" onClick={() => onOpenDetails(b.id)}>
-                  <div className="flex items-center gap-5">
-                     <div className="w-14 h-14 bg-white rounded-2xl flex flex-col items-center justify-center border-2 border-slate-100 group-hover:border-sky-500 transition-colors shadow-sm">
-                        <span className="text-[8px] font-black text-slate-400 uppercase">Unit</span>
-                        <span className="text-xl font-black text-sky-600 tracking-tighter">{state.apartments.find(a => a.id === b.apartmentId)?.unitNumber || '??'}</span>
-                     </div>
-                     <div>
-                        <p className="font-black text-slate-950 text-base uppercase leading-none">{state.customers.find(c => c.id === b.customerId)?.name || 'Walk-in Guest'}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">{b.startDate} → {b.endDate}</p>
-                     </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${b.status === 'stay' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{b.status}</span>
-                    <ChevronRight className="w-5 h-5 text-slate-300" />
-                  </div>
-                </div>
-              )) : (
-                <div className="py-20 text-center opacity-20 font-black text-xs uppercase tracking-[0.5em]">Zero Activity Records</div>
-              )}
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+             <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-sky-500" />
+                <h3 className="text-lg font-black uppercase text-slate-800 tracking-tighter">Live Movement Log</h3>
+             </div>
+             <button className="p-2 hover:bg-slate-100 rounded-lg transition-all"><ChevronRight className="w-5 h-5 text-slate-400" /></button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+               <thead>
+                  <tr className="text-[9px] font-black uppercase tracking-widest text-slate-400 border-b">
+                     <th className="px-8 py-5">Date</th>
+                     <th className="px-8 py-5">Status</th>
+                     <th className="px-8 py-5">Guest</th>
+                     <th className="px-8 py-5">Unit</th>
+                     <th className="px-8 py-5 text-right">Action</th>
+                  </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                  {recentMovements.map((b, i) => (
+                    <tr key={i} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => onOpenDetails(b.id)}>
+                      <td className="px-8 py-5 text-[11px] font-bold text-slate-500">{b.startDate}</td>
+                      <td className="px-8 py-5">
+                         <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded flex items-center justify-center ${b.status === 'confirmed' || b.status === 'stay' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                               <CheckCircle2 className="w-3 h-3" />
+                            </div>
+                            <span className={`text-[10px] font-black uppercase ${b.status === 'confirmed' || b.status === 'stay' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                               {b.status}
+                            </span>
+                         </div>
+                      </td>
+                      <td className="px-8 py-5">
+                         <p className="text-sm font-black text-slate-800 uppercase leading-none">
+                            {state.customers.find(c => c.id === b.customerId)?.name || 'Guest'}
+                         </p>
+                      </td>
+                      <td className="px-8 py-5">
+                         <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-black">
+                            {state.apartments.find(a => a.id === b.apartmentId)?.unitNumber || '?'}
+                         </span>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                         <button className="px-6 py-2 bg-slate-800 text-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-600 transition-all">
+                            View
+                         </button>
+                      </td>
+                    </tr>
+                  ))}
+               </tbody>
+            </table>
           </div>
         </div>
 
-        {/* SIDEBAR WIDGETS */}
         <div className="space-y-8">
-          <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden border-t-8 border-sky-400">
-             <Wallet className="absolute -right-6 -bottom-6 w-40 h-40 opacity-5 rotate-12" />
-             <h3 className="text-sm font-black uppercase tracking-widest mb-8 text-slate-400">Portfolio Health</h3>
-             <div className="space-y-8 relative z-10">
-                <div className="pb-6 border-b border-white/5">
-                   <p className="text-[9px] font-black text-sky-400 uppercase tracking-[0.2em] mb-2">Operational Cash</p>
-                   <p className="text-3xl font-black tracking-tighter">{stats.revenue.toLocaleString()} <span className="text-xs opacity-40">EGP</span></p>
-                </div>
-                <div>
-                   <p className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-2">Market Sentiment</p>
-                   <div className="flex items-center gap-4">
-                      <TrendingUp className="text-emerald-500 w-8 h-8" />
-                      <span className="text-2xl font-black tracking-tighter uppercase">High Yield</span>
-                   </div>
-                </div>
-             </div>
-          </div>
+           <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm p-8 flex flex-col h-full">
+              <div className="flex justify-between items-center mb-8">
+                 <div className="flex items-center gap-3">
+                    <Zap className="w-5 h-5 text-sky-500" />
+                    <h3 className="text-lg font-black uppercase text-slate-800 tracking-tighter">Guest Services</h3>
+                 </div>
+              </div>
 
-          <div className="bg-white rounded-[2.5rem] p-10 border-2 border-slate-100 shadow-sm">
-             <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest mb-6">Inventory Status</h3>
-             <div className="space-y-4">
-                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                   <span className="text-xs font-bold text-slate-600">Premium Suites</span>
-                   <span className="text-lg font-black text-slate-950">{state.apartments.filter(a => a.rooms > 2).length}</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                   <span className="text-xs font-bold text-slate-600">Pool View Units</span>
-                   <span className="text-lg font-black text-slate-950">{state.apartments.filter(a => a.view.includes('Pool')).length}</span>
-                </div>
-             </div>
-          </div>
+              <div className="space-y-4 flex-1">
+                 {guestServices.map((gs, i) => (
+                   <div key={i} className="flex items-center gap-4 group">
+                      <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black text-xs shrink-0 group-hover:bg-emerald-500 group-hover:text-white transition-colors">{gs.unit}</div>
+                      <div className="flex-1 min-w-0">
+                         <div className="flex justify-between items-start">
+                            <p className="text-[12px] font-black text-slate-800 uppercase truncate">{gs.service}</p>
+                            <p className="text-xs font-black text-slate-800">{gs.price.toLocaleString()} <span className="text-[8px] opacity-40">{gs.currency}</span></p>
+                         </div>
+                         <div className="flex justify-between items-center mt-1">
+                            <p className="text-[9px] font-bold text-slate-400 uppercase truncate">{gs.guest}</p>
+                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${gs.status === 'PAID' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>{gs.status}</span>
+                         </div>
+                      </div>
+                   </div>
+                 ))}
+                 {guestServices.length === 0 && (
+                   <div className="py-10 text-center opacity-30 font-black text-[10px] uppercase">No pending services</div>
+                 )}
+              </div>
+           </div>
+
+           <div className="bg-[#1e293b] rounded-[2.5rem] p-8 text-slate-100 shadow-2xl relative overflow-hidden">
+              <h3 className="text-sm font-black uppercase tracking-widest mb-6 flex items-center gap-2">
+                 <Zap className="w-4 h-4 text-sky-400" /> Quick Actions
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                 <button className="bg-white/5 border border-white/10 p-5 rounded-2xl hover:bg-white/10 transition-all text-left">
+                    <LogOut className="w-6 h-6 mb-3 text-rose-400" />
+                    <p className="text-xs font-black uppercase">Operations</p>
+                    <p className="text-[8px] font-bold opacity-40 mt-1">Movement Log</p>
+                 </button>
+                 <button className="bg-emerald-500 p-5 rounded-2xl hover:bg-emerald-600 transition-all text-left text-white shadow-lg shadow-emerald-500/20">
+                    <CreditCard className="w-6 h-6 mb-3" />
+                    <p className="text-xs font-black uppercase">Finance</p>
+                    <p className="text-[8px] font-bold opacity-60 mt-1">Treasury</p>
+                 </button>
+              </div>
+           </div>
         </div>
       </div>
     </div>

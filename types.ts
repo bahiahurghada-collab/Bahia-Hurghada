@@ -44,7 +44,7 @@ export interface Owner {
   email?: string;
   bankAccount?: string;
   contractType: 'Percentage' | 'Fixed';
-  contractValue: number; // e.g., 20 for 20% or 5000 for Fixed
+  contractValue: number;
 }
 
 export interface Apartment {
@@ -52,12 +52,14 @@ export interface Apartment {
   unitNumber: string;
   floor: number;
   rooms: number;
+  baths: number; // حقل جديد
   view: string;
   dailyPrice: number;
   monthlyPrice: number;
   maxDiscount: number;
   images: string[];
-  ownerId?: string; // الربط مع المالك
+  ownerId?: string;
+  status?: 'AVAILABLE' | 'OCCUPIED' | 'MAINTENANCE'; // حقل حالة افتراضي للواجهة
 }
 
 export interface Customer {
@@ -71,7 +73,10 @@ export interface Customer {
 export interface ExtraService {
   id: string;
   name: string;
+  description?: string;
   price: number;
+  currency: Currency;
+  isActive: boolean;
   isFree: boolean;
 }
 
@@ -144,7 +149,7 @@ export interface AppNotification {
 
 export interface AppState {
   apartments: Apartment[];
-  owners: Owner[]; // إضافة مصفوفة الملاك
+  owners: Owner[];
   customers: Customer[];
   bookings: Booking[];
   services: ExtraService[];

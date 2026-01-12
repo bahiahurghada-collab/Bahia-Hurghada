@@ -18,9 +18,9 @@ import { storageService } from './services/storageService';
 import { ShieldAlert, Key, User as UserIcon, Loader2, Sparkles, RotateCcw } from 'lucide-react';
 
 const INITIAL_SERVICES: ExtraService[] = [
-  { id: 's1', name: 'Premium Cleaning', price: 300, isFree: false },
-  { id: 's2', name: 'Airport Transfer', price: 500, isFree: false },
-  { id: 's3', name: 'Laundry Service', price: 150, isFree: false },
+  { id: 's1', name: 'Premium Cleaning', price: 300, isFree: false, currency: 'EGP', isActive: true },
+  { id: 's2', name: 'Airport Transfer', price: 500, isFree: false, currency: 'EGP', isActive: true },
+  { id: 's3', name: 'Laundry Service', price: 150, isFree: false, currency: 'EGP', isActive: true },
 ];
 
 const ADMIN_PERMISSIONS: UserPermissions = {
@@ -49,7 +49,6 @@ const App: React.FC = () => {
     if (!loaded.users || loaded.users.length === 0) {
       return { ...loaded, users: [DEFAULT_ADMIN] };
     }
-    // ضمان وجود مصفوفة الملاك في البيانات المحملة
     if (!loaded.owners) loaded.owners = [];
     if (!loaded.notifications) loaded.notifications = [];
     return loaded;
@@ -156,6 +155,27 @@ const App: React.FC = () => {
     addLog('Update Booking', `Modified folio ${id}`);
   };
 
+  const handleFulfillService = (bookingId: string, serviceId: string, isExtra: boolean) => {
+    setState(prev => ({
+      ...prev,
+      bookings: prev.bookings.map(b => {
+        if (b.id !== bookingId) return b;
+        if (isExtra) {
+          return {
+            ...b,
+            extraServices: b.extraServices.map(es => es.id === serviceId ? { ...es, isFulfilled: true } : es)
+          };
+        } else {
+          return {
+            ...b,
+            fulfilledServices: [...(b.fulfilledServices || []), serviceId]
+          };
+        }
+      })
+    }));
+    addLog('Service Fulfillment', `Service ${serviceId} fulfilled for booking ${bookingId}`);
+  };
+
   const handleMarkNotifRead = (id: string) => {
     setState(prev => ({
       ...prev,
@@ -165,13 +185,13 @@ const App: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 relative overflow-hidden">
+      <div className="min-h-screen bg-[#111827] flex items-center justify-center p-6 relative overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-sky-500/10 rounded-full blur-[120px] animate-pulse"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse"></div>
         
-        <div className="w-full max-w-md bg-white rounded-[3.5rem] p-12 shadow-2xl border-4 border-slate-900 relative z-10 animate-fade-in">
+        <div className="w-full max-w-md bg-white rounded-[3.5rem] p-12 shadow-2xl border-4 border-slate-800 relative z-10 animate-fade-in">
           <div className="text-center mb-10">
-            <div className="inline-block p-4 bg-slate-950 rounded-3xl mb-6 shadow-xl">
+            <div className="inline-block p-4 bg-slate-800 rounded-3xl mb-6 shadow-xl">
               <Sparkles className="w-8 h-8 text-sky-400" />
             </div>
             <h1 className="text-5xl font-black text-slate-900 uppercase tracking-tighter italic">BAHIA<span className="text-sky-500">.</span></h1>
@@ -186,20 +206,20 @@ const App: React.FC = () => {
               </div>
             )}
             <div className="relative group">
-              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-slate-950 transition-colors" />
-              <input type="text" required placeholder="Access ID" className="w-full p-6 pl-14 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-950 focus:border-slate-950 outline-none transition-all" value={loginForm.user} onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
+              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
+              <input type="text" required placeholder="Access ID" className="w-full p-6 pl-14 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-900 focus:border-slate-800 outline-none transition-all" value={loginForm.user} onChange={e => setLoginForm({...loginForm, user: e.target.value})} />
             </div>
             <div className="relative group">
-              <Key className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-slate-950 transition-colors" />
-              <input type="password" required placeholder="Security Key" className="w-full p-6 pl-14 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-950 focus:border-slate-950 outline-none transition-all" value={loginForm.pass} onChange={e => setLoginForm({...loginForm, pass: e.target.value})} />
+              <Key className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
+              <input type="password" required placeholder="Security Key" className="w-full p-6 pl-14 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-900 focus:border-slate-800 outline-none transition-all" value={loginForm.pass} onChange={e => setLoginForm({...loginForm, pass: e.target.value})} />
             </div>
-            <button disabled={isLoggingIn} className="w-full bg-slate-950 text-white py-6 rounded-3xl font-black uppercase tracking-widest text-xs hover:bg-sky-600 transition-all shadow-2xl border-b-8 border-slate-800 flex items-center justify-center gap-3">
+            <button disabled={isLoggingIn} className="w-full bg-slate-800 text-slate-100 py-6 rounded-3xl font-black uppercase tracking-widest text-xs hover:bg-sky-600 transition-all shadow-2xl border-b-8 border-slate-900 flex items-center justify-center gap-3">
               {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : "Initiate Terminal"}
             </button>
           </form>
 
           <div className="mt-10 text-center border-t border-slate-100 pt-8">
-            <button onClick={handleRestoreV15} className="text-[9px] font-black text-slate-300 uppercase tracking-widest hover:text-sky-500 transition-colors flex items-center justify-center gap-2 mx-auto group">
+            <button onClick={handleRestoreV15} className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-sky-500 transition-colors flex items-center justify-center gap-2 mx-auto group">
               <RotateCcw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" /> System Rescue
             </button>
           </div>
@@ -226,7 +246,7 @@ const App: React.FC = () => {
       {activeTab === 'customers' && <Customers state={state} onUpdateCustomer={(id, u) => setState(prev => ({...prev, customers: prev.customers.map(c => c.id === id ? {...c, ...u} : c)}))} onDeleteCustomer={id => setState(prev => ({...prev, customers: prev.customers.filter(c => c.id !== id)}))} permissions={user.permissions} />}
       {activeTab === 'maintenance' && <MaintenanceManagement expenses={state.expenses} apartments={state.apartments} onAddExpense={(exp) => setState(prev => ({...prev, expenses: [...prev.expenses, {...exp, id: Math.random().toString(36).substr(2, 9)}]}))} onDeleteExpense={(id) => setState(prev => ({...prev, expenses: prev.expenses.filter(e => e.id !== id)}))} />}
       {activeTab === 'reports' && <Reports state={state} />}
-      {activeTab === 'services' && <ServicesManagement state={state} onAdd={(s) => setState(p => ({...p, services: [...p.services, {...s, id: Math.random().toString(36).substr(2, 9)}]}))} onUpdate={(id, u) => setState(p => ({...p, services: p.services.map(s => s.id === id ? {...s, ...u} : s)}))} onDelete={(id) => setState(p => ({...p, services: p.services.filter(s => s.id !== id)}))} onFulfillService={() => {}} />}
+      {activeTab === 'services' && <ServicesManagement state={state} onAdd={(s) => setState(p => ({...p, services: [...p.services, {...s, id: Math.random().toString(36).substr(2, 9)}]}))} onUpdate={(id, u) => setState(p => ({...p, services: p.services.map(s => s.id === id ? {...s, ...u} : s)}))} onDelete={(id) => setState(p => ({...p, services: p.services.filter(s => s.id !== id)}))} onFulfillService={handleFulfillService} />}
       {activeTab === 'commissions' && <CommissionManagement state={state} onUpdateBooking={handleUpdateBooking} />}
       {activeTab === 'team' && <UserManagement users={state.users} onAddUser={(u) => setState(prev => ({...prev, users: [...prev.users, {...u, id: Math.random().toString(36).substr(2, 9)} as any]}))} onUpdateUser={(id, u) => setState(prev => ({...prev, users: prev.users.map(us => us.id === id ? {...us, ...u} : us)}))} onDeleteUser={id => setState(prev => ({...prev, users: prev.users.filter(u => u.id !== id)}))} />}
       {activeTab === 'logs' && <SystemLogs state={state} onImport={(f) => storageService.importData(f).then(setState)} onClearLogs={() => setState(p => ({...p, logs: []}))} />}

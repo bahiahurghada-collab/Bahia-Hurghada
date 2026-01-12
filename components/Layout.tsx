@@ -21,9 +21,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, user,
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: 'canViewDashboard' },
     { id: 'calendar', label: 'Timeline', icon: CalendarDays, permission: 'canViewTimeline' },
     { id: 'apartments', label: 'Units', icon: Building2, permission: 'canViewUnits' },
-    { id: 'owners', label: 'Owners', icon: Briefcase, permission: 'canManageUnits' }, // موديول الملاك الجديد
+    { id: 'owners', label: 'Owners', icon: Briefcase, permission: 'canManageUnits' }, 
     { id: 'bookings', label: 'Bookings', icon: ConciergeBell, permission: 'canViewBookings' },
-    { id: 'services', label: 'Amenities', icon: Zap, permission: 'canViewServices' },
+    { id: 'services', label: 'Services', icon: Zap, permission: 'canViewServices' },
     { id: 'maintenance', label: 'Expenses', icon: Hammer, permission: 'canViewMaintenance' },
     { id: 'customers', label: 'Guests', icon: Users, permission: 'canViewCustomers' },
     { id: 'commissions', label: 'Commissions', icon: BadgePercent, permission: 'canManageCommissions' },
@@ -35,10 +35,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, user,
   const filteredNav = navItems.filter(item => user.permissions[item.permission as keyof typeof user.permissions]);
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] overflow-hidden text-slate-900">
-      <aside className="w-64 bg-slate-950 flex flex-col shadow-2xl z-40 border-r border-white/5">
+    <div className="flex h-screen bg-[#f1f5f9] overflow-hidden text-slate-800">
+      <aside className="w-64 bg-[#1e293b] flex flex-col shadow-2xl z-40 border-r border-white/5">
         <div className="p-8 text-center shrink-0">
-          <h1 className="text-3xl font-black text-white italic tracking-tighter">BAHIA<span className="text-sky-400">.</span></h1>
+          <h1 className="text-3xl font-black text-slate-100 italic tracking-tighter">BAHIA<span className="text-sky-400">.</span></h1>
           <p className="text-[8px] font-black uppercase text-slate-500 tracking-[0.4em] mt-2">Elite PMS System</p>
         </div>
 
@@ -50,20 +50,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, user,
               className={`w-full flex items-center gap-4 px-5 py-3 rounded-2xl transition-all duration-300 ${
                 activeTab === item.id 
                 ? 'bg-sky-500 text-white font-black shadow-lg shadow-sky-500/20' 
-                : 'text-slate-500 hover:bg-white/5 hover:text-white font-bold'
+                : 'text-slate-400 hover:bg-white/5 hover:text-slate-100 font-bold'
               }`}
             >
-              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
+              <item.icon className={`w-5 h-5 ${activeTab === item.id ? 'text-white' : 'text-slate-400'}`} />
               <span className="text-[11px] uppercase tracking-widest">{item.label}</span>
             </button>
           ))}
         </nav>
 
-        <div className="p-6 shrink-0 border-t border-white/5 bg-slate-900/40">
+        <div className="p-6 shrink-0 border-t border-white/5 bg-[#111827]/40">
           <div className="flex items-center gap-3 mb-4 bg-white/5 p-3 rounded-2xl">
             <UserCircle className="w-8 h-8 text-sky-400" />
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-black text-white truncate uppercase">{user.name}</p>
+              <p className="text-[11px] font-black text-slate-100 truncate uppercase">{user.name}</p>
               <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">{user.role}</p>
             </div>
           </div>
@@ -81,7 +81,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, user,
           </div>
           
           <div className="flex items-center gap-6">
-            {/* Notification Bell */}
             <div className="relative">
               <button 
                 onClick={() => setShowNotifications(!showNotifications)}
@@ -98,7 +97,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, user,
               {showNotifications && (
                 <div className="absolute right-0 mt-4 w-96 bg-white rounded-[2rem] shadow-2xl border border-slate-200 z-[100] animate-in fade-in slide-in-from-top-4">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h4 className="font-black uppercase text-xs tracking-widest">System Alerts</h4>
+                    <h4 className="font-black uppercase text-xs tracking-widest text-slate-800">System Alerts</h4>
                     <button onClick={() => setShowNotifications(false)}><X className="w-4 h-4 text-slate-400"/></button>
                   </div>
                   <div className="max-h-[400px] overflow-y-auto p-4 space-y-3">
@@ -115,9 +114,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange, user,
               )}
             </div>
 
-            <div className="flex items-center gap-4 bg-slate-950 px-6 py-2.5 rounded-full border border-slate-800">
+            <div className="flex items-center gap-4 bg-[#1e293b] px-6 py-2.5 rounded-full border border-slate-700">
                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-               <span className="text-[10px] font-black uppercase text-white tracking-widest">System Active</span>
+               <span className="text-[10px] font-black uppercase text-slate-200 tracking-widest">System Active</span>
             </div>
           </div>
         </header>

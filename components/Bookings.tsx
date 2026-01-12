@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, Trash2, Edit2, Search, X, Wallet, 
-  Calendar, Zap, RefreshCw, ConciergeBell, Check, ArrowRight, UserPlus, Coins, Percent, Clock
+  Calendar, Zap, RefreshCw, ConciergeBell, Check, ArrowRight, UserPlus, Coins, Percent, Clock, Smartphone, Globe, Upload, Plane
 } from 'lucide-react';
 import { AppState, Booking, Customer, PaymentStatus, BookingStatus, Currency } from '../types';
 import { PLATFORMS, PAYMENT_METHODS, CURRENCIES, NATIONALITIES } from '../constants';
@@ -12,7 +12,6 @@ interface BookingsProps {
   onAddBooking: (booking: Omit<Booking, 'id' | 'displayId'>, newCustomer?: Omit<Customer, 'id'>) => void;
   onUpdateBooking: (id: string, updates: Partial<Booking>) => void;
   onDeleteBooking: (id: string) => void;
-  onCancelBooking?: (id: string) => void;
   userRole: 'admin' | 'reception';
   userName: string;
   isInternalModalOnly?: boolean;
@@ -51,48 +50,26 @@ const Bookings: React.FC<BookingsProps> = ({
       const b = state.bookings.find(x => x.id === initialEditId);
       if (b) {
         setEditingBookingId(b.id);
-        setFormData({ 
-          ...b, 
-          newCustomer: { name: '', phone: '', email: '', nationality: 'Egyptian' },
-          selectedServiceIds: b.services || []
-        } as any);
+        setFormData({ ...b, newCustomer: { name: '', phone: '', email: '', nationality: 'Egyptian' }, selectedServiceIds: b.services || [] } as any);
         setIsModalOpen(true);
       }
     }
   }, [initialEditId, state.bookings]);
 
   const calculateAutoValues = useMemo(() => {
-    if (!formData.apartmentId || !formData.startDate || !formData.endDate) return { total: 0, nights: 0 };
+    if (!formData.apartmentId || !formData.startDate || !formData.endDate) return { total: 0, nights: 0, rent: 0, services: 0 };
     const apt = state.apartments.find(a => a.id === formData.apartmentId);
-    if (!apt) return { total: 0, nights: 0 };
+    if (!apt) return { total: 0, nights: 0, rent: 0, services: 0 };
     
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
     const nights = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
     
     const servicePrice = formData.selectedServiceIds.reduce((acc, sid) => acc + (state.services.find(s => s.id === sid)?.price || 0), 0);
-    const baseTotal = (nights >= 30 && apt.monthlyPrice) ? apt.monthlyPrice : apt.dailyPrice * nights;
+    const rent = (nights >= 30 && apt.monthlyPrice) ? apt.monthlyPrice : apt.dailyPrice * nights;
     
-    return { total: baseTotal + servicePrice - formData.discount, nights };
+    return { total: rent + servicePrice - formData.discount, nights, rent, services: servicePrice };
   }, [formData, state]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const finalTotal = calculateAutoValues.total;
-    const bookingData = {
-      ...formData,
-      totalAmount: finalTotal,
-      bookingDate: new Date().toISOString().split('T')[0],
-      paymentStatus: (formData.paidAmount >= finalTotal ? 'Paid' : formData.paidAmount > 0 ? 'Partial' : 'Unpaid') as PaymentStatus,
-      services: formData.selectedServiceIds,
-      fulfilledServices: [],
-      extraServices: []
-    };
-
-    if (editingBookingId) onUpdateBooking(editingBookingId, bookingData);
-    else onAddBooking(bookingData, formData.customerId === 'new' ? formData.newCustomer : undefined);
-    closeModal();
-  };
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -108,217 +85,185 @@ const Bookings: React.FC<BookingsProps> = ({
     });
   };
 
-  const filteredBookings = useMemo(() => {
-    return state.bookings.filter(b => {
-      const customer = state.customers.find(c => c.id === b.customerId);
-      return searchQuery === '' || (customer?.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    }).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  }, [state, searchQuery]);
+  const totals = calculateAutoValues;
 
   return (
     <div className="space-y-6 font-bold pb-20">
       {!isInternalModalOnly && (
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-8 rounded-[3rem] border-2 border-slate-950 shadow-2xl">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-8 rounded-[3rem] border border-slate-200 shadow-sm">
            <div className="flex items-center gap-5">
-              <div className="w-16 h-16 bg-slate-950 rounded-[2rem] flex items-center justify-center text-white shadow-2xl">
+              <div className="w-16 h-16 bg-[#1e293b] rounded-[2rem] flex items-center justify-center text-slate-100">
                  <ConciergeBell className="w-8 h-8 text-sky-400" />
               </div>
               <div>
-                 <h2 className="text-3xl font-black text-slate-950 tracking-tighter uppercase leading-none">Reservations Folio</h2>
-                 <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span> {state.bookings.length} OPERATIONAL RECORDS
-                 </p>
+                 <h2 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Reservations</h2>
+                 <p className="text-slate-400 text-[10px] uppercase tracking-widest">{state.bookings.length} Verified Records</p>
               </div>
            </div>
            <div className="flex items-center gap-4">
               <div className="relative w-64">
                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                 <input placeholder="Filter By Guest..." className="w-full pl-12 pr-6 py-4 rounded-2xl bg-slate-50 border-2 border-slate-100 focus:border-slate-950 outline-none font-black text-xs transition-all text-slate-950" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                 <input placeholder="Search Guest..." className="w-full pl-12 pr-6 py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 ring-sky-500 outline-none font-black text-xs transition-all text-slate-800" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
               </div>
-              <button onClick={() => setIsModalOpen(true)} className="bg-slate-950 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-2 hover:bg-sky-500 transition-all border-b-4 border-slate-800">
+              <button onClick={() => setIsModalOpen(true)} className="bg-[#1e293b] text-slate-100 px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center gap-2 hover:bg-sky-600 transition-all">
                  <Plus className="w-5 h-5" /> New Booking
               </button>
            </div>
         </div>
       )}
 
-      {!isInternalModalOnly && (
-        <div className="bg-white rounded-[4rem] border-2 border-slate-950 shadow-2xl overflow-hidden overflow-x-auto">
-           <table className="w-full text-left">
-             <thead className="bg-slate-950 text-white">
-               <tr className="text-[9px] font-black uppercase tracking-widest opacity-60">
-                 <th className="px-10 py-6">Guest / Asset</th>
-                 <th className="px-10 py-6">Timeline Window</th>
-                 <th className="px-10 py-6">Status Index</th>
-                 <th className="px-10 py-6 text-right">Accounting (EGP/USD)</th>
-                 <th className="px-10 py-6 text-right">Operational Actions</th>
-               </tr>
-             </thead>
-             <tbody className="divide-y divide-slate-100">
-               {filteredBookings.map(b => (
-                 <tr key={b.id} className="hover:bg-slate-50 transition-all group">
-                   <td className="px-10 py-6">
-                      <p className="font-black text-slate-950 text-base uppercase leading-none">{state.customers.find(c => c.id === b.customerId)?.name || 'Guest'}</p>
-                      <p className="text-[9px] font-black text-sky-600 uppercase mt-2">UNIT {state.apartments.find(a => a.id === b.apartmentId)?.unitNumber} • FOLIO: {b.displayId}</p>
-                   </td>
-                   <td className="px-10 py-6 text-xs text-slate-950 font-black">
-                      <div className="flex items-center gap-2"><Calendar className="w-3 h-3 opacity-30" /> {b.startDate}</div>
-                      <div className="flex items-center gap-2 mt-1 opacity-40"><ArrowRight className="w-3 h-3" /> {b.endDate}</div>
-                   </td>
-                   <td className="px-10 py-6">
-                      <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm border-2 ${
-                        b.status === 'stay' ? 'bg-emerald-600 text-white border-emerald-700' : 
-                        b.status === 'confirmed' ? 'bg-sky-600 text-white border-sky-700' :
-                        'bg-slate-950 text-white border-slate-800'
-                      }`}>
-                        {b.status}
-                      </span>
-                   </td>
-                   <td className="px-10 py-6 text-right">
-                      <p className="text-xl font-black text-slate-950">{b.totalAmount.toLocaleString()} <span className="text-[10px] opacity-40">{b.currency}</span></p>
-                      <p className={`text-[9px] font-black mt-1 uppercase ${b.paidAmount >= b.totalAmount ? 'text-emerald-600' : 'text-rose-600'}`}>
-                         Balance: {(b.totalAmount - b.paidAmount).toLocaleString()}
-                      </p>
-                   </td>
-                   <td className="px-10 py-6 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                         <button onClick={() => { setEditingBookingId(b.id); setIsModalOpen(true); }} className="p-3 bg-white text-slate-950 border-2 border-slate-100 hover:border-slate-950 rounded-xl shadow-sm transition-all"><Edit2 className="w-4 h-4" /></button>
-                         <button onClick={() => {if(window.confirm('Delete Folio?')) onDeleteBooking(b.id);}} className="p-3 bg-white text-rose-600 border-2 border-slate-100 hover:border-rose-600 rounded-xl shadow-sm transition-all"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                   </td>
-                 </tr>
-               ))}
-             </tbody>
-           </table>
-        </div>
-      )}
-
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-2xl z-[1000] flex items-center justify-center p-4">
-           <div className="bg-white rounded-[4rem] p-12 max-w-6xl w-full border-4 border-slate-950 animate-in zoom-in-95 max-h-[95vh] overflow-y-auto custom-scrollbar shadow-2xl">
-              <div className="flex justify-between items-center mb-10 border-b-2 border-slate-100 pb-8 sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 bg-[#0f172a]/95 backdrop-blur-xl z-[2000] flex items-center justify-center p-4">
+           <div className="bg-[#f8fafc] rounded-[3rem] w-full max-w-7xl shadow-2xl animate-in zoom-in-95 max-h-[92vh] flex flex-col border-4 border-slate-200 overflow-hidden">
+              <div className="p-8 shrink-0 flex justify-between items-center bg-white border-b border-slate-200">
                  <div>
-                    <h3 className="text-4xl font-black text-slate-950 tracking-tighter uppercase leading-none">{editingBookingId ? 'Modify Transaction' : 'Initialize New Folio'}</h3>
-                    <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-2 flex items-center gap-2">
-                       <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span> BAHIA SMART PMS ENGINE V19.0 PRO
-                    </p>
+                    <h3 className="text-3xl font-black text-slate-800 tracking-tighter uppercase flex items-center gap-4">
+                       New Smart Reservation
+                       <span className="text-[10px] bg-emerald-100 text-emerald-600 px-3 py-1 rounded-lg tracking-widest">Express Check-in</span>
+                    </h3>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Complete details below. Live pricing is active.</p>
                  </div>
-                 <button onClick={closeModal} className="p-4 hover:bg-slate-100 rounded-full transition-all text-slate-950"><X className="w-10 h-10" /></button>
+                 <button onClick={closeModal} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400"><X className="w-8 h-8" /></button>
               </div>
               
-              <form onSubmit={handleSubmit} className="space-y-12">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                    {/* Identity & Asset Management */}
-                    <div className="space-y-8">
-                       <div className="p-10 bg-slate-50 rounded-[3rem] border-2 border-slate-100 space-y-8">
-                          <h4 className="text-xs font-black uppercase text-slate-400 tracking-[0.3em] mb-4 flex items-center gap-3"><UserPlus className="w-5 h-5 text-slate-950"/> Profile & Unit Selection</h4>
+              <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row">
+                 <form className="flex-1 p-10 space-y-10" id="main-booking-form" onSubmit={(e) => { e.preventDefault(); const bookingData = { ...formData, totalAmount: totals.total, bookingDate: new Date().toISOString().split('T')[0], paymentStatus: (formData.paidAmount >= totals.total ? 'Paid' : formData.paidAmount > 0 ? 'Partial' : 'Unpaid') as PaymentStatus, services: formData.selectedServiceIds, fulfilledServices: [], extraServices: [] }; if (editingBookingId) onUpdateBooking(editingBookingId, bookingData); else onAddBooking(bookingData, formData.customerId === 'new' ? formData.newCustomer : undefined); closeModal(); }}>
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div className="space-y-2 col-span-full">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Full Name</label>
+                             <input required placeholder="Name as per ID" className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black focus:bg-white focus:border-slate-800 transition-all outline-none text-slate-800" value={formData.customerId === 'new' ? formData.newCustomer.name : (state.customers.find(c => c.id === formData.customerId)?.name || '')} onChange={e => { if(formData.customerId === 'new') setFormData({...formData, newCustomer: {...formData.newCustomer, name: e.target.value}}); }} />
+                          </div>
                           <div className="space-y-2">
-                             <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Apartment Unit</label>
-                             <select required className="w-full p-6 rounded-[2rem] border-2 border-transparent bg-white shadow-xl font-black text-slate-950 outline-none focus:border-slate-950 transition-all text-lg" value={formData.apartmentId} onChange={e => setFormData({...formData, apartmentId: e.target.value})}>
-                                <option value="">Select Asset...</option>
-                                {state.apartments.map(a => <option key={a.id} value={a.id}>Unit {a.unitNumber} - Floor {a.floor} ({a.view})</option>)}
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Contact</label>
+                             <input required placeholder="+20..." className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black focus:bg-white focus:border-slate-800 transition-all outline-none text-slate-800" value={formData.customerId === 'new' ? formData.newCustomer.phone : (state.customers.find(c => c.id === formData.customerId)?.phone || '')} onChange={e => { if(formData.customerId === 'new') setFormData({...formData, newCustomer: {...formData.newCustomer, phone: e.target.value}}); }} />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Nationality</label>
+                             <select className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.customerId === 'new' ? formData.newCustomer.nationality : (state.customers.find(c => c.id === formData.customerId)?.nationality || 'Egyptian')} onChange={e => { if(formData.customerId === 'new') setFormData({...formData, newCustomer: {...formData.newCustomer, nationality: e.target.value}}); }}>
+                                {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
                              </select>
                           </div>
                           <div className="space-y-2">
-                             <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Guest Profile</label>
-                             <select className="w-full p-6 rounded-[2rem] border-2 border-transparent bg-white shadow-xl font-black text-slate-950 outline-none focus:border-slate-950 transition-all text-lg" value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})}>
-                                <option value="new">+ Enroll New Guest Identity</option>
-                                {state.customers.map(c => <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>)}
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Booked By (Employee)</label>
+                             <select required className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.receptionistName} onChange={e => setFormData({...formData, receptionistName: e.target.value})}>
+                                <option value="">Select Employee...</option>
+                                {state.users.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
                              </select>
                           </div>
-                          {formData.customerId === 'new' && (
-                             <div className="p-8 bg-sky-50 rounded-[2.5rem] border-2 border-sky-100 space-y-4 animate-in slide-in-from-top-4">
-                                <input required placeholder="Guest Legal Full Name" className="w-full p-5 rounded-2xl border-2 border-white shadow-sm font-bold text-slate-950" value={formData.newCustomer.name} onChange={e => setFormData({...formData, newCustomer: {...formData.newCustomer, name: e.target.value}})} />
-                                <div className="grid grid-cols-2 gap-4">
-                                   <input required placeholder="Primary Phone" className="w-full p-5 rounded-2xl border-2 border-white shadow-sm font-bold text-slate-950" value={formData.newCustomer.phone} onChange={e => setFormData({...formData, newCustomer: {...formData.newCustomer, phone: e.target.value}})} />
-                                   <select className="w-full p-5 rounded-2xl border-2 border-white shadow-sm font-bold text-slate-950" value={formData.newCustomer.nationality} onChange={e => setFormData({...formData, newCustomer: {...formData.newCustomer, nationality: e.target.value}})}>
-                                      {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
-                                   </select>
-                                </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Booking Platform</label>
+                             <select required className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.platform} onChange={e => setFormData({...formData, platform: e.target.value})}>
+                                {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                             </select>
+                          </div>
+                       </div>
+                       <div className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50 hover:bg-white hover:border-sky-500 transition-all cursor-pointer group">
+                          <Upload className="w-8 h-8 text-slate-300 group-hover:text-sky-500 mb-2" />
+                          <p className="text-[10px] font-black uppercase text-slate-400 group-hover:text-sky-600">Click to scan Passport / ID</p>
+                       </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+                       <h4 className="text-[10px] font-black uppercase text-slate-800 tracking-[0.3em] flex items-center gap-2"><Calendar className="w-4 h-4 text-emerald-500"/> Logistics & Unit</h4>
+                       <div className="grid grid-cols-2 gap-8">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Check-In</label>
+                             <input type="date" required className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Check-Out</label>
+                             <input type="date" required className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                          </div>
+                          <div className="space-y-2 col-span-full">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Unit Selection</label>
+                             <select className="w-full p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.apartmentId} onChange={e => setFormData({...formData, apartmentId: e.target.value})}>
+                                <option value="">Select Unit...</option>
+                                {state.apartments.map(a => <option key={a.id} value={a.id}>Unit {a.unitNumber} — {a.dailyPrice} EGP/night</option>)}
+                             </select>
+                          </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-8">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Flight No.</label>
+                             <div className="relative">
+                                <Plane className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                                <input placeholder="Optional" className="w-full pl-12 p-5 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" />
                              </div>
-                          )}
+                          </div>
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Pax</label>
+                             <div className="flex gap-2">
+                                <button type="button" className="flex-1 p-5 rounded-2xl bg-[#1e293b] text-slate-100 font-black">2</button>
+                                <button type="button" className="flex-1 p-5 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 font-black">0</button>
+                             </div>
+                          </div>
+                       </div>
+                    </div>
+                 </form>
+
+                 <div className="w-full lg:w-[450px] bg-white border-l border-slate-200 p-10 flex flex-col justify-between">
+                    <div className="space-y-10">
+                       <div>
+                          <h4 className="text-[10px] font-black uppercase text-slate-800 tracking-[0.3em] flex items-center gap-2 mb-6"><Coins className="w-4 h-4 text-amber-500"/> Payment Details</h4>
+                          <div className="space-y-4">
+                             <div className="flex justify-between text-sm font-bold text-slate-500 uppercase tracking-widest">
+                                <span>Unit Rent (Total)</span>
+                                <span className="text-slate-800 font-black">{totals.rent.toLocaleString()} {formData.currency}</span>
+                             </div>
+                             <div className="flex justify-between text-sm font-bold text-slate-500 uppercase tracking-widest">
+                                <span>Services & Add-ons</span>
+                                <span className="text-slate-800 font-black">{totals.services.toLocaleString()} {formData.currency}</span>
+                             </div>
+                          </div>
                        </div>
 
-                       <div className="p-10 bg-slate-50 rounded-[3rem] border-2 border-slate-100 space-y-6">
-                          <h4 className="text-xs font-black uppercase text-slate-400 tracking-[0.3em] mb-4 flex items-center gap-3"><Zap className="w-5 h-5 text-slate-950"/> Package Amenities</h4>
-                          <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-6">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Available Add-ons</label>
+                          <div className="space-y-3">
                              {state.services.map(s => (
-                                <button key={s.id} type="button" onClick={() => setFormData(p => ({...p, selectedServiceIds: p.selectedServiceIds.includes(s.id) ? p.selectedServiceIds.filter(x => x !== s.id) : [...p.selectedServiceIds, s.id]}))} className={`p-5 rounded-2xl border-2 font-black text-[11px] uppercase tracking-tighter transition-all flex justify-between items-center ${formData.selectedServiceIds.includes(s.id) ? 'bg-slate-950 text-white border-slate-950 shadow-xl scale-[1.02]' : 'bg-white text-slate-400 border-slate-100 hover:border-sky-500'}`}>
-                                   {s.name}
-                                   {formData.selectedServiceIds.includes(s.id) && <Check className="w-4 h-4 text-sky-400" />}
-                                </button>
+                               <label key={s.id} className={`flex items-center justify-between p-4 rounded-2xl cursor-pointer hover:bg-sky-50 transition-all border border-transparent hover:border-sky-200 ${!s.isActive ? 'hidden' : 'bg-slate-50'}`}>
+                                  <div className="flex items-center gap-3">
+                                     <input type="checkbox" className="w-4 h-4 rounded text-sky-500 focus:ring-sky-500" checked={formData.selectedServiceIds.includes(s.id)} onChange={() => setFormData(p => ({...p, selectedServiceIds: p.selectedServiceIds.includes(s.id) ? p.selectedServiceIds.filter(x => x !== s.id) : [...p.selectedServiceIds, s.id]}))} />
+                                     <span className="text-[11px] font-black uppercase text-slate-800">{s.name}</span>
+                                  </div>
+                                  <span className="text-[11px] font-black text-slate-400">{s.price} {s.currency}</span>
+                               </label>
                              ))}
                           </div>
                        </div>
+
+                       <div className="space-y-4">
+                          <div className="space-y-2">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4">Payment Method</label>
+                             <select required className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-black outline-none text-slate-800" value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})}>
+                                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                             </select>
+                          </div>
+                          <div className="pt-4 border-t border-slate-100">
+                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-4 block mb-2">Deposit Paid</label>
+                             <div className="relative">
+                                <input type="number" className="w-full bg-slate-50 border-2 border-slate-100 rounded-3xl p-6 font-black text-4xl text-emerald-600 outline-none focus:border-emerald-500 focus:bg-white transition-all shadow-inner" value={formData.paidAmount || ''} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} placeholder="0" />
+                                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400 uppercase tracking-widest">{formData.currency}</span>
+                             </div>
+                          </div>
+                       </div>
                     </div>
 
-                    {/* Stay Dynamics & Accounting */}
-                    <div className="space-y-8">
-                       <div className="p-10 bg-slate-50 rounded-[3rem] border-2 border-slate-100 space-y-6">
-                          <h4 className="text-xs font-black uppercase text-slate-400 tracking-[0.3em] mb-4 flex items-center gap-3"><Calendar className="w-5 h-5 text-slate-950"/> Stay Timeline Logistics</h4>
-                          <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Arrival Date</label>
-                                <input type="date" required className="w-full p-6 rounded-[2rem] border-2 border-transparent bg-white shadow-xl font-black text-slate-950 outline-none focus:border-slate-950 transition-all" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
-                             </div>
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Departure Date</label>
-                                <input type="date" required className="w-full p-6 rounded-[2rem] border-2 border-transparent bg-white shadow-xl font-black text-slate-950 outline-none focus:border-slate-950 transition-all" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
-                             </div>
+                    <div className="mt-12 space-y-6">
+                       <div className="p-8 bg-[#1e293b] rounded-[2.5rem] text-slate-100 flex justify-between items-center shadow-2xl">
+                          <div>
+                             <p className="text-[9px] font-black uppercase opacity-40 tracking-widest mb-1">Total Balance Due</p>
+                             <p className="text-4xl font-black tracking-tighter text-sky-400">{(totals.total - formData.paidAmount).toLocaleString()}</p>
                           </div>
-                          <div className="grid grid-cols-2 gap-6 mt-4">
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Channel Origin</label>
-                                <select className="w-full p-6 rounded-[2rem] border-2 border-transparent bg-white shadow-xl font-black text-slate-950 outline-none focus:border-slate-950 transition-all" value={formData.platform} onChange={e => setFormData({...formData, platform: e.target.value})}>
-                                   {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                             </div>
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">System Status</label>
-                                <select className="w-full p-6 rounded-[2rem] border-2 border-transparent bg-white shadow-xl font-black text-slate-950 outline-none focus:border-slate-950 transition-all" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as BookingStatus})}>
-                                   <option value="confirmed">Confirmed (Pre-Arrival)</option>
-                                   <option value="stay">Active (In-House)</option>
-                                   <option value="pending">Pending Information</option>
-                                   <option value="checked_out">Checked Out (Archive)</option>
-                                </select>
-                             </div>
-                          </div>
+                          <span className="text-xl font-black opacity-20">{formData.currency}</span>
                        </div>
-
-                       <div className="p-10 bg-slate-950 rounded-[3rem] text-white space-y-10 shadow-2xl relative overflow-hidden border-b-[12px] border-sky-500">
-                          <Coins className="absolute -right-10 -bottom-10 w-64 h-64 opacity-10 rotate-12" />
-                          <div className="grid grid-cols-2 gap-12 relative z-10">
-                             <div>
-                                <label className="text-[10px] font-black uppercase text-sky-400 tracking-[0.3em] block mb-3">Audited Gross Revenue</label>
-                                <div className="text-5xl font-black tracking-tighter text-white">{calculateAutoValues.total.toLocaleString()} <span className="text-xs opacity-40">{formData.currency}</span></div>
-                                <div className="text-[10px] font-black text-slate-500 mt-3 uppercase tracking-widest">{calculateAutoValues.nights} SYSTEM NIGHTS</div>
-                             </div>
-                             <div>
-                                <label className="text-[10px] font-black uppercase text-sky-400 tracking-[0.3em] block mb-3">Settlement Received</label>
-                                <input type="number" className="w-full bg-white/10 border-2 border-white/10 rounded-[2rem] p-6 font-black text-4xl text-emerald-400 outline-none focus:border-emerald-500 transition-all shadow-inner" value={formData.paidAmount || ''} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} placeholder="0.00" />
-                             </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-12 relative z-10">
-                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] block mb-3">Sales Commission (Internal)</label>
-                                <input type="number" className="w-full bg-white/5 border-2 border-white/5 rounded-[1.5rem] p-5 font-black text-2xl text-sky-500 outline-none focus:border-sky-500 transition-all" value={formData.commissionAmount || ''} onChange={e => setFormData({...formData, commissionAmount: Number(e.target.value)})} placeholder="0.00" />
-                             </div>
-                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-500 tracking-[0.3em] block mb-3">Portfolio Currency</label>
-                                <select className="w-full bg-white/5 border-2 border-white/5 rounded-[1.5rem] p-5 font-black text-2xl text-white outline-none focus:border-sky-500 transition-all" value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value as Currency})}>
-                                   {CURRENCIES.map(c => <option key={c} value={c} className="text-slate-950 font-black">{c}</option>)}
-                                </select>
-                             </div>
-                          </div>
-                       </div>
+                       <button type="submit" form="main-booking-form" className="w-full py-8 bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 active:scale-95">
+                          Confirm Booking
+                       </button>
                     </div>
                  </div>
-
-                 <button type="submit" className="w-full py-10 bg-slate-950 text-white rounded-[2.5rem] font-black uppercase tracking-[0.5em] shadow-2xl hover:bg-sky-600 transition-all border-b-8 border-slate-900 group flex items-center justify-center gap-4 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-white/5 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                    <Check className="w-8 h-8 group-hover:scale-125 transition-all" /> Commit Global Transaction
-                 </button>
-              </form>
+              </div>
            </div>
         </div>
       )}

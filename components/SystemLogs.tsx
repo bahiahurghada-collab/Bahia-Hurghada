@@ -22,23 +22,21 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
 
   const handleDeepRestore = () => {
     if (window.confirm("WARNING: Deep Restore V15 will clear all volatile cache and restore standard system permissions. Proceed?")) {
-      // The actual logic is handled in App.tsx handleRestoreV15, 
-      // but we can trigger a hard reload here too.
       window.location.reload();
     }
   };
 
   return (
     <div className="space-y-10 pb-32 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-10 rounded-[3rem] border-2 border-slate-100 shadow-xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-white p-10 rounded-[3rem] border border-slate-200 shadow-xl">
         <div>
-          <h2 className="text-4xl font-black text-slate-950 tracking-tighter uppercase">System Terminal</h2>
+          <h2 className="text-4xl font-black text-slate-800 tracking-tighter uppercase">System Terminal</h2>
           <p className="text-slate-500 font-bold mt-2">Audit logs, security events, and V15 restoration hub</p>
         </div>
         <div className="flex gap-4">
           <button 
             onClick={() => storageService.exportData(state)}
-            className="flex items-center gap-3 bg-slate-950 text-white px-8 py-4 rounded-2xl font-black hover:bg-black transition-all shadow-lg"
+            className="flex items-center gap-3 bg-[#1e293b] text-slate-100 px-8 py-4 rounded-2xl font-black hover:bg-sky-600 transition-all shadow-lg"
           >
             <Download className="w-5 h-5" /> Export Backup
           </button>
@@ -50,9 +48,9 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 bg-white rounded-[3rem] border-2 border-slate-100 shadow-xl overflow-hidden">
-          <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-            <h3 className="text-xl font-black text-slate-900 uppercase flex items-center gap-3">
+        <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-200 shadow-xl overflow-hidden">
+          <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+            <h3 className="text-xl font-black text-slate-800 uppercase flex items-center gap-3">
               <History className="w-6 h-6 text-sky-600" /> Audit Trail
             </h3>
             <button onClick={onClearLogs} className="text-rose-600 text-[10px] font-black uppercase hover:underline">Clear History</button>
@@ -67,11 +65,11 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
                   <th className="px-10 py-6">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-slate-100">
                 {state.logs.map(log => (
                   <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-10 py-5 text-[10px] font-bold text-slate-400">{new Date(log.timestamp).toLocaleString()}</td>
-                    <td className="px-10 py-5 font-black text-slate-900 text-xs">{log.user}</td>
+                    <td className="px-10 py-5 font-black text-slate-800 text-xs">{log.user}</td>
                     <td className="px-10 py-5">
                       <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase">{log.action}</span>
                     </td>
@@ -89,7 +87,7 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
         </div>
 
         <div className="space-y-8">
-          <div className="bg-amber-50 p-10 rounded-[3rem] border-2 border-amber-100 shadow-sm">
+          <div className="bg-amber-50 p-10 rounded-[3rem] border border-amber-100 shadow-sm">
              <div className="flex items-center gap-4 mb-6">
                 <RotateCcw className="w-8 h-8 text-amber-600" />
                 <h3 className="text-xl font-black text-amber-950 uppercase">V15 Restoration</h3>
@@ -105,7 +103,7 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
              </button>
           </div>
 
-          <div className="bg-rose-50 p-10 rounded-[3rem] border-2 border-rose-100 shadow-sm">
+          <div className="bg-rose-50 p-10 rounded-[3rem] border border-rose-100 shadow-sm">
              <div className="flex items-center gap-4 mb-6">
                 <ShieldAlert className="w-8 h-8 text-rose-600" />
                 <h3 className="text-xl font-black text-rose-950 uppercase">Danger Zone</h3>
@@ -121,7 +119,7 @@ const SystemLogs: React.FC<SystemLogsProps> = ({ state, onImport, onClearLogs })
              </button>
           </div>
 
-          <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-xl">
+          <div className="bg-[#1e293b] p-10 rounded-[3rem] text-slate-100 shadow-xl">
              <h3 className="text-lg font-black uppercase mb-6 tracking-tighter">System Health</h3>
              <div className="space-y-4">
                 <div className="flex justify-between border-b border-white/10 pb-4">
